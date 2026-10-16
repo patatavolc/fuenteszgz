@@ -6,7 +6,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Fuentes Zaragoza — agua pública cerca de ti",
-  description: "Mapa personal de fuentes para beber en Zaragoza con datos municipales, ubicación y rutas a pie.",
+  description: "Mapa personal de fuentes para beber en Zaragoza con datos municipales y ubicación.",
   applicationName: "Fuentes Zaragoza",
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#f7f8f5" };

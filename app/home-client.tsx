@@ -8,7 +8,7 @@ import { distanceMeters, findNearby, fountains, hasSeasonalEvidence, municipalFo
 import { geolocationStateFromError, type GeolocationState } from "@/lib/geolocation";
 import { getFavorites, getIncidents, saveFavorite, saveIncident } from "@/lib/local-storage";
 import { incidentSchema } from "@/lib/validation";
-import type { Fountain, Incident, IncidentKind, Origin, Point, RouteResult } from "@/lib/types";
+import type { Fountain, Incident, IncidentKind, Origin, Point } from "@/lib/types";
 
 const MapView = dynamic(() => import("@/components/map-view").then((module) => module.MapView), {
   ssr: false, loading: () => <div className="map-loading"><span className="spinner"/>Preparando el mapa…</div>,
@@ -49,9 +49,6 @@ export default function HomeClient() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [searchText, setSearchText] = useState("");
   const [searchError, setSearchError] = useState("");
-  const [route, setRoute] = useState<RouteResult | null>(null);
-  const [routeMessage, setRouteMessage] = useState("");
-  const [routeBusy, setRouteBusy] = useState(false);
   const [selectingOrigin, setSelectingOrigin] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [maxKm, setMaxKm] = useState(8);
@@ -79,8 +76,8 @@ export default function HomeClient() {
     setHasChosenOrigin(false);
     location.locate(setRecenter);
   };
-  const useMapOrigin = (point: Point) => { setOrigin({ ...point, label: "Punto elegido en el mapa" }); setHasChosenOrigin(true); setSelectingOrigin(false); setRoute(null); setRouteMessage(""); };
-  const chooseFountain = useCallback((fountain: Fountain) => { setSelected(fountain); setRoute(null); setRouteMessage(""); setRecenter(fountain); }, []);
+  const useMapOrigin = (point: Point) => { setOrigin({ ...point, label: "Punto elegido en el mapa" }); setHasChosenOrigin(true); setSelectingOrigin(false); };
+  const chooseFountain = useCallback((fountain: Fountain) => { setSelected(fountain); setRecenter(fountain); }, []);
   const toggleFavorite = (id: string) => setFavoriteIds(saveFavorite(id));
 
   const searchAddress = async (event: React.FormEvent) => {
@@ -96,21 +93,9 @@ export default function HomeClient() {
       if (!response.ok) throw new Error(data.error ?? "No se encontraron resultados.");
       if (!data.length) throw new Error("No se encontró ese lugar dentro de Zaragoza.");
       const candidate = data[0] as Origin;
-      setOrigin({ ...candidate, label: candidate.label.split(",").slice(0, 3).join(",") }); setHasChosenOrigin(true); setRecenter(candidate); setSelected(null); setRoute(null); setSearchText("");
+      setOrigin({ ...candidate, label: candidate.label.split(",").slice(0, 3).join(",") }); setHasChosenOrigin(true); setRecenter(candidate); setSelected(null); setSearchText("");
     } catch (error) { setSearchError(error instanceof Error ? error.message : "No se pudo buscar el lugar."); }
     finally { setGeocoding(false); }
-  };
-
-  const calculateRoute = async (fountain: Fountain) => {
-    const routeOrigin = actualOrigin;
-    setRouteBusy(true); setRouteMessage(""); setRoute(null);
-    try {
-      const response = await fetch("/api/route", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ origin: routeOrigin, destination: { lat: fountain.lat, lon: fountain.lon } }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "No se pudo calcular la ruta.");
-      setRoute(data as RouteResult); setRouteMessage("Ruta peatonal estática; no ofrece navegación giro a giro.");
-    } catch (error) { setRouteMessage(error instanceof Error ? error.message : "No se pudo calcular la ruta."); }
-    finally { setRouteBusy(false); }
   };
 
   const submitIncident = (event: React.FormEvent) => {
@@ -125,7 +110,7 @@ export default function HomeClient() {
 
   return <main className="app-shell relative">
     <div className="map-region" aria-label="Mapa de fuentes públicas de agua">
-      <MapView fountains={mapFountains} selectedId={selected?.id} userPoint={location.point} origin={hasChosenOrigin ? origin : null} route={route} recenter={recenter} chooseOrigin={useMapOrigin} onSelect={chooseFountain} selectingOrigin={selectingOrigin}/>
+      <MapView fountains={mapFountains} selectedId={selected?.id} userPoint={location.point} origin={hasChosenOrigin ? origin : null} recenter={recenter} chooseOrigin={useMapOrigin} onSelect={chooseFountain} selectingOrigin={selectingOrigin}/>
       <header className="topbar">
         <a className="brand" href="#inicio" aria-label="Fuentes Zaragoza, inicio"><span className="brand-icon"><Droplets size={22}/></span><span><strong>fuentes<span>zgz</span></strong><small>Zaragoza · agua pública</small></span></a>
         <button className="icon-button location-button" onClick={startGeolocation} aria-label="Localizarme" title="Localizarme"><LocateFixed size={21}/></button>
@@ -154,11 +139,9 @@ export default function HomeClient() {
           <div className={`status-pill ${selected.source === "OpenStreetMap (comunidad)" ? "community-pill" : selected.status === "operativa" ? "good" : selected.status === "desconocida" ? "muted" : "bad"}`}><span/> {statusText(selected)}</div>
           <p className="address-line"><MapPin size={16}/>{selected.address ?? selected.location ?? "Sin dirección publicada"}</p>
           <div className="detail-distance"><span>Distancia en línea recta</span><strong>{formatDistance(distanceMeters(actualOrigin, selected))}</strong></div>
-          {route && <div className="route-summary"><div><Navigation size={16}/><span>Ruta a pie</span></div><strong>{formatDistance(route.distanceMeters)} <small>· {Math.round(route.durationSeconds / 60)} min</small></strong></div>}
-          {routeMessage && <p className={route ? "route-note" : "inline-error"}>{routeMessage}</p>}
           {hasSeasonalEvidence(selected) && <p className="detail-extra">Disponibilidad estacional según OSM: {typeof selected.seasonal === "string" && selected.seasonal !== "yes" ? selected.seasonal : "marcada como estacional"}. No es un calendario verificado.</p>}
           {selected.accessibility && <p className="detail-extra">Accesibilidad según OSM: {selected.accessibility === "yes" ? "accesible para silla de ruedas" : selected.accessibility === "no" ? "no accesible para silla de ruedas" : selected.accessibility}.</p>}
-          <div className="action-grid"><button className="primary-action" disabled={routeBusy} onClick={() => route ? (setRoute(null), setRouteMessage("")) : void calculateRoute(selected)}>{routeBusy ? <span className="tiny-spinner"/> : route ? <X size={17}/> : <Navigation size={17}/>} {routeBusy ? "Calculando…" : route ? "Borrar ruta" : "Ruta a pie"}</button><button className="secondary-action" onClick={() => toggleFavorite(selected.id)}>{favoriteIds.includes(selected.id) ? <Check size={17}/> : <Bookmark size={17}/>} {favoriteIds.includes(selected.id) ? "Guardado" : "Guardar"}</button></div>
+          <div className="action-grid single-action"><button className="secondary-action" onClick={() => toggleFavorite(selected.id)}>{favoriteIds.includes(selected.id) ? <Check size={17}/> : <Bookmark size={17}/>} {favoriteIds.includes(selected.id) ? "Guardado" : "Guardar"}</button></div>
           <div className="external-links"><a href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat},${selected.lon}&travelmode=walking`} target="_blank" rel="noreferrer">Google Maps ↗</a><a href={`https://maps.apple.com/?daddr=${selected.lat},${selected.lon}&dirflg=w`} target="_blank" rel="noreferrer">Apple Maps ↗</a></div>
           <div className="source-card"><div><ShieldAlert size={16}/><strong>Procedencia y fiabilidad</strong></div><p>{selected.source === "Ayuntamiento de Zaragoza" ? "Ayuntamiento de Zaragoza · conjunto publicado en julio de 2023. La ficha no aporta fecha de inspección individual." : `OpenStreetMap · dato comunitario${selected.sourceUpdatedAt ? ` (base de datos ${new Date(selected.sourceUpdatedAt).toLocaleDateString("es-ES")})` : ""}. No es una confirmación municipal.`} Nivel de confianza de procedencia: {selected.confidence}.</p><a href={selected.sourceUrl} target="_blank" rel="noreferrer">Ver fuente original ↗</a></div>
           <button className="report-link" onClick={() => setShowIncident((value) => !value)}><ShieldAlert size={16}/> Informar de una incidencia <span>(solo local)</span></button>

@@ -21,7 +21,6 @@ export type Fountain = Point & {
   osmTags?: Record<string, string>;
 };
 
-export type RouteResult = { coordinates: Point[]; distanceMeters: number; durationSeconds: number };
 export type IncidentKind = "averiada" | "cerrada" | "inaccesible" | "informacion-incorrecta";
 export type Incident = { id: string; fountainId: string; kind: IncidentKind; observedAt: string; note?: string };
 export type Origin = Point & { label: string };
