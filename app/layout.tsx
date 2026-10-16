@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   description: "Mapa personal de fuentes para beber en Zaragoza con datos municipales y ubicación.",
   applicationName: "Fuentes Zaragoza",
 };
-export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#f7f8f5" };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#D92A22" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="es"><body>{children}</body></html>;
