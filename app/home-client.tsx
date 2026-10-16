@@ -45,6 +45,7 @@ export default function HomeClient() {
   const [origin, setOrigin] = useState<Origin>(center);
   const [hasChosenOrigin, setHasChosenOrigin] = useState(false);
   const [selected, setSelected] = useState<Fountain | null>(null);
+  const [sheetCollapsed, setSheetCollapsed] = useState(false);
   const [tab, setTab] = useState<"mapa" | "lista" | "favoritos">("mapa");
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -125,8 +126,8 @@ export default function HomeClient() {
       <div className="map-controls"><button className="map-control" onClick={startGeolocation}><LocateFixed size={19}/><span>Localizarme</span></button><button className={`map-control ${location.watching ? "active" : ""}`} onClick={location.toggleWatch}>{location.watching ? <X size={17}/> : <Compass size={17}/>}<span>{location.watching ? "Parar seguimiento" : "Seguirme"}</span></button>{selectingOrigin && <button className="map-control active" onClick={() => setSelectingOrigin(false)}><X size={18}/><span>Cancelar origen</span></button>}</div>
       <div className="map-legend"><span><i className="legend-dot"/> Ayuntamiento</span><span><i className="legend-dot community"/> OSM · comunidad</span><span><i className="legend-dot unknown"/> Estado desconocido</span></div>
       <div className="attribution-note">Mapa © OpenStreetMap · <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noreferrer">Informar de un error</a></div>
-      <section className={`bottom-sheet ${selected ? "has-selection" : ""}`} aria-label="Resultados de fuentes">
-        <div className="sheet-handle" aria-hidden="true"/><div className="sheet-header"><div><span className="eyebrow">{tab === "favoritos" ? "TUS PUNTOS GUARDADOS" : "CERCA DE TI"}</span><h1>{selected ? selected.name : `${visibleResults.length} fuentes`}</h1><p>{selected ? selected.location ?? selected.address ?? "Zaragoza" : `Desde ${location.point ? "tu ubicación" : actualOrigin.label}`}</p></div><button className="collapse-button" onClick={() => setTab(tab === "mapa" ? "lista" : "mapa")} aria-label="Cambiar vista de resultados"><ChevronDown size={18}/></button></div>
+      <section className={`bottom-sheet ${selected ? "has-selection" : ""} ${sheetCollapsed ? "collapsed" : ""}`} aria-label="Resultados de fuentes">
+        <div className="sheet-handle" aria-hidden="true"/><div className="sheet-header"><div><span className="eyebrow">{tab === "favoritos" ? "TUS PUNTOS GUARDADOS" : "CERCA DE TI"}</span><h1>{selected ? selected.name : `${visibleResults.length} fuentes`}</h1><p>{selected ? selected.location ?? selected.address ?? "Zaragoza" : `Desde ${location.point ? "tu ubicación" : actualOrigin.label}`}</p></div><button className="collapse-button" onClick={() => setSheetCollapsed((value) => !value)} aria-label={sheetCollapsed ? "Mostrar resultados" : "Ocultar resultados"} aria-expanded={!sheetCollapsed}><ChevronDown size={18}/></button></div>
         {!selected ? <>
           <nav className="tabs" aria-label="Vistas"><button className={tab !== "favoritos" ? "selected" : ""} onClick={() => setTab("mapa")}><MapPin size={16}/> Cercanas</button><button className={tab === "favoritos" ? "selected" : ""} onClick={() => { setFavoriteIds(getFavorites()); setTab("favoritos"); }}><Bookmark size={15}/> Favoritos {favoriteIds.length > 0 && <span className="count-badge">{favoriteIds.length}</span>}</button></nav>
           <div className="list-meta"><span>En línea recta · ordenadas por distancia</span><button onClick={() => { setRecenter(location.point ?? origin); }}><Compass size={15}/> Centrar</button></div>
