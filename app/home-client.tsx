@@ -22,22 +22,13 @@ const statusText = (fountain: Fountain) => fountain.source === "OpenStreetMap (c
 function useLocation() {
   const [state, setState] = useState<GeolocationState>("sin-solicitar");
   const [point, setPoint] = useState<Point | null>(null);
-  const [watching, setWatching] = useState(false);
-  const [watchId, setWatchId] = useState<number | null>(null);
   const locate = useCallback((onLocated?: (point: Point) => void) => {
     if (!navigator.geolocation) { setState("no-disponible"); return; }
     setState("pendiente");
     navigator.geolocation.getCurrentPosition(({ coords }) => { const value = { lat: coords.latitude, lon: coords.longitude }; setPoint(value); setState("concedida"); onLocated?.(value); }, ({ code }) => setState(geolocationStateFromError(code)), { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
   }, []);
   useEffect(() => { locate(); }, [locate]);
-  const toggleWatch = () => {
-    if (watchId !== null) { navigator.geolocation.clearWatch(watchId); setWatchId(null); setWatching(false); return; }
-    if (!navigator.geolocation) { setState("no-disponible"); return; }
-    setState("pendiente");
-    const id = navigator.geolocation.watchPosition(({ coords }) => { setPoint({ lat: coords.latitude, lon: coords.longitude }); setState("concedida"); setWatching(true); }, ({ code }) => { setState(geolocationStateFromError(code)); setWatching(false); setWatchId(null); }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
-    setWatchId(id);
-  };
-  return { state, point, watching, locate, toggleWatch };
+  return { state, point, locate };
 }
 
 export default function HomeClient() {
@@ -114,7 +105,6 @@ export default function HomeClient() {
     <div className="map-region" aria-label="Mapa de fuentes públicas de agua">
       <MapView fountains={mapFountains} selectedId={selected?.id} userPoint={location.point} origin={hasChosenOrigin ? origin : null} recenter={recenter} chooseOrigin={useMapOrigin} onSelect={chooseFountain} selectingOrigin={selectingOrigin}/>
       <header className="topbar">
-        <a className="brand" href="#inicio" aria-label="Fuentes Zaragoza, inicio"><span className="brand-icon"><Droplets size={22}/></span><span><strong>fuentes<span>zgz</span></strong><small>Zaragoza · agua pública</small></span></a>
         <button className="icon-button location-button" onClick={startGeolocation} aria-label="Localizarme" title="Localizarme"><LocateFixed size={21}/></button>
       </header>
       <section className="search-box" aria-label="Buscar un lugar">
@@ -123,11 +113,11 @@ export default function HomeClient() {
         <div className="search-subrow"><button type="button" className="subtle-button" onClick={() => { setSelectingOrigin(true); setNotice("Toca un punto del mapa para elegir el origen."); }}>Elegir origen en el mapa</button><button type="button" className="filter-trigger" onClick={() => setShowFilters((value) => !value)} aria-expanded={showFilters}><SlidersHorizontal size={16}/> Filtros <ChevronDown size={14}/></button></div>
         {showFilters && <div className="filters-panel"><label>Distancia máxima <span>{maxKm} km</span><input type="range" min="0.5" max="20" step="0.5" value={maxKm} onChange={(event) => setMaxKm(Number(event.target.value))}/></label><label className="check-label"><input type="checkbox" checked={greenOnly} onChange={(event) => setGreenOnly(event.target.checked)}/> Solo parques y zonas verdes identificados</label><label>Estado disponible<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="todas">Todos los estados</option><option value="operativa">En servicio municipal</option><option value="averiada">Averiada (con evidencia)</option><option value="cerrada">Cerrada (con evidencia)</option><option value="fuera-de-servicio">Fuera de servicio</option><option value="desconocida">Desconocido</option></select></label><label className="check-label"><input type="checkbox" checked={excludeSeasonal} onChange={(event) => setExcludeSeasonal(event.target.checked)}/> Excluir puntos marcados estacionales</label><p>La estacionalidad solo se muestra cuando la etiqueta existe en OSM.</p></div>}
       </section>
-      <div className="map-controls"><button className="map-control" onClick={startGeolocation}><LocateFixed size={19}/><span>Localizarme</span></button><button className={`map-control ${location.watching ? "active" : ""}`} onClick={location.toggleWatch}>{location.watching ? <X size={17}/> : <Compass size={17}/>}<span>{location.watching ? "Parar seguimiento" : "Seguirme"}</span></button>{selectingOrigin && <button className="map-control active" onClick={() => setSelectingOrigin(false)}><X size={18}/><span>Cancelar origen</span></button>}</div>
+      {selectingOrigin && <div className="map-controls"><button className="map-control active" onClick={() => setSelectingOrigin(false)}><X size={18}/><span>Cancelar origen</span></button></div>}
       <div className="map-legend"><span><i className="legend-dot"/> Ayuntamiento</span><span><i className="legend-dot community"/> OSM · comunidad</span><span><i className="legend-dot unknown"/> Estado desconocido</span></div>
       <div className="attribution-note">Mapa © OpenStreetMap · <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noreferrer">Informar de un error</a></div>
       <section className={`bottom-sheet ${selected ? "has-selection" : ""} ${sheetCollapsed ? "collapsed" : ""}`} aria-label="Resultados de fuentes">
-        <div className="sheet-handle" aria-hidden="true"/><div className="sheet-header"><div><span className="eyebrow">{tab === "favoritos" ? "TUS PUNTOS GUARDADOS" : "CERCA DE TI"}</span><h1>{selected ? selected.name : `${visibleResults.length} fuentes`}</h1><p>{selected ? selected.location ?? selected.address ?? "Zaragoza" : `Desde ${location.point ? "tu ubicación" : actualOrigin.label}`}</p></div><button className="collapse-button" onClick={() => setSheetCollapsed((value) => !value)} aria-label={sheetCollapsed ? "Mostrar resultados" : "Ocultar resultados"} aria-expanded={!sheetCollapsed}><ChevronDown size={18}/></button></div>
+        <div className="sheet-handle" aria-label="Arrastra para plegar o mostrar la tarjeta" onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); event.currentTarget.dataset.startY = String(event.clientY); }} onPointerUp={(event) => { const startY = Number(event.currentTarget.dataset.startY); const delta = event.clientY - startY; if (delta > 40) setSheetCollapsed(true); else if (delta < -40) setSheetCollapsed(false); }} /><div className="sheet-header"><div><span className="eyebrow">{tab === "favoritos" ? "TUS PUNTOS GUARDADOS" : "CERCA DE TI"}</span><h1>{selected ? selected.name : `${visibleResults.length} fuentes`}</h1><p>{selected ? selected.location ?? selected.address ?? "Zaragoza" : `Desde ${location.point ? "tu ubicación" : actualOrigin.label}`}</p></div><button className="collapse-button" onClick={() => setSheetCollapsed((value) => !value)} aria-label={sheetCollapsed ? "Mostrar resultados" : "Ocultar resultados"} aria-expanded={!sheetCollapsed}><ChevronDown size={18}/></button></div>
         {!selected ? <>
           <nav className="tabs" aria-label="Vistas"><button className={tab !== "favoritos" ? "selected" : ""} onClick={() => setTab("mapa")}><MapPin size={16}/> Cercanas</button><button className={tab === "favoritos" ? "selected" : ""} onClick={() => { setFavoriteIds(getFavorites()); setTab("favoritos"); }}><Bookmark size={15}/> Favoritos {favoriteIds.length > 0 && <span className="count-badge">{favoriteIds.length}</span>}</button></nav>
           <div className="list-meta"><span>En línea recta · ordenadas por distancia</span><button onClick={() => { setRecenter(location.point ?? origin); }}><Compass size={15}/> Centrar</button></div>

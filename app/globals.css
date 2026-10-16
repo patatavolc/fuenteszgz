@@ -13,6 +13,9 @@ button,a,input,select,textarea{touch-action:manipulation}button:focus-visible,a:
 @media(max-width:759px){.map-region:not(:has(.bottom-sheet.has-selection)) .leaflet-bottom{bottom:calc(51dvh + 100px)!important}.map-region:has(.bottom-sheet.has-selection) .leaflet-bottom{bottom:calc(69dvh + 100px)!important}}
 
 .bottom-sheet.collapsed{max-height:104px;overflow:hidden}
+.topbar{justify-content:flex-end}
+.sheet-handle{touch-action:none;cursor:grab}
+.sheet-handle:active{cursor:grabbing}
 .bottom-sheet.collapsed .sheet-header{align-items:center}
 .bottom-sheet.collapsed .collapse-button{transform:rotate(180deg)}
 .bottom-sheet.collapsed>.tabs,.bottom-sheet.collapsed>.list-meta,.bottom-sheet.collapsed>.results-list,.bottom-sheet.collapsed>.detail-content{display:none}
