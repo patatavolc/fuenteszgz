@@ -1,2 +1,95 @@
-# fuenteszgz
-Mapa interactivo para saber la ubicacion de las fuentes de agua potable de Zaragoza, estoy cansado de no encontrar la web oficial, ademas de que es mil veces mejorable
+# Fuentes Zaragoza
+
+Aplicación web personal mobile-first para localizar fuentes públicas para beber en Zaragoza. Usa Next.js App Router, TypeScript, Tailwind CSS, Leaflet y react-leaflet. El mapa y las funciones principales trabajan con el snapshot municipal incluido; la geolocalización, geocodificación y rutas son optativas y degradan con mensajes claros si no están disponibles.
+
+## Requisitos y desarrollo
+
+- Node.js 20.9 o superior y npm.
+- Clona el repositorio existente y ejecuta:
+
+```sh
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
+Abre [http://localhost:3000](http://localhost:3000). Para producción y verificación:
+
+```sh
+npm run typecheck
+npm run lint
+npm test
+npm run build
+npm start
+```
+
+Pruebas de navegador para tamaños móviles y escritorio (tras compilar):
+
+```sh
+npx playwright install chromium
+npm run test:e2e
+```
+
+En la revisión del proyecto, `npm audit --omit=dev` no reportó vulnerabilidades de producción. El audit completo sí señala 5 avisos altos en la cadena de herramientas de ESLint (`braces`/`micromatch` bajo `eslint-config-next`), instalada solo para desarrollo y lint; se deben reevaluar al actualizarla.
+
+La aplicación no necesita cuenta, base de datos ni clave para explorar los inventarios. La ubicación solo se solicita tras pulsar el control; en producción requiere HTTPS. Los favoritos e incidencias comunitarias son locales al navegador. El catálogo municipal autoriza la reutilización comercial y no comercial bajo condiciones de atribución, fecha y no respaldo institucional; véase el aviso municipal en la documentación.
+
+## Funciones
+
+- Mapa Leaflet con agrupación progresiva de marcadores, controles de zoom táctiles, atribución OSM y selección de fuente.
+- Resultados cercanos ordenados por distancia en línea recta; distancia siempre identificada como tal.
+- Búsqueda local en nombres/ubicaciones y búsqueda puntual de direcciones con Nominatim al enviar el formulario (sin autocompletado).
+- Geolocalización puntual y seguimiento explícito con botón para detenerlo. También se puede elegir origen tocando el mapa.
+- Filtros combinables de distancia, zonas verdes identificadas, estado y exclusión estacional cuando OSM aporta esa etiqueta. La ficha muestra accesibilidad solo cuando el dato existe.
+- Ficha con procedencia, estado disponible, favoritos locales, incidencias locales y enlaces a Google/Apple Maps.
+- Ruta real a pie mediante openrouteservice si se configura la clave. La línea es estática; no es navegación giro a giro.
+
+## Datos, licencias y limitaciones
+
+El inventario procede del [catálogo municipal de Fuentes de agua para beber](https://www.zaragoza.es/web/espacio-de-datos/servicio/catalogo/2860), con capa WFS IDEZar `medioambiente:fuente_agua_potable`. La ficha describe 697 elementos y última actualización 13/07/2023. En la consulta del 16/10/2026 el WFS anunció 653; se pudieron recuperar 650 geometrías en EPSG:4326 tras errores de reproyección en tres índices. No se afirma que la cobertura sea completa. `en_servicio` se presenta como dato del Ayuntamiento, no como garantía de que la fuente funcione hoy. No hay fecha de inspección individual.
+
+OpenStreetMap aporta también 523 candidatos comunitarios consultados el 16/10/2026 mediante Overpass. Se muestran diferenciados de las fuentes municipales y como no confirmados oficialmente. La consulta selecciona `amenity=drinking_water` y otras etiquetas explícitas de agua potable; excluye elementos etiquetados con acceso privado/no. Sus teselas y datos requieren atribución OSM y están bajo sus condiciones (ODbL para la base de datos). Las teselas estándar son de mejor esfuerzo y no ofrecen capacidad ilimitada; el mapa solo pide teselas visibles, sin descarga offline ni precarga. Para cargas elevadas debe configurarse un proveedor compatible.
+
+Consulta [Fuentes, licencias y límites](docs/FUENTES-DE-DATOS.md) y la página `/fuentes` en la aplicación. Este producto no es información de emergencia; comprueba la fuente en el lugar.
+
+## Actualizar el inventario
+
+`npm run data:update` pagina el WFS municipal, reproyecta a EPSG:4326 y guarda el snapshot en `data/municipal-snapshot.geojson`. Si algunas geometrías fallan, se recuperan las páginas en bloques menores y se omiten únicamente las que el servidor no puede transformar. El script no reemplaza los datos ante una respuesta sustancialmente incompleta. `npm run osm:update` actualiza los candidatos OSM mediante una consulta acotada de Overpass (no es una llamada por visitante). Revisa los conteos y el diff, actualiza `docs/FUENTES-DE-DATOS.md` y registra el cambio en `CHANGELOG.md`.
+
+## Rutas y geocodificación
+
+Configura `ORS_API_KEY` como variable de entorno del **servidor** (y en Vercel Project Settings → Environment Variables). No uses prefijo `NEXT_PUBLIC_`. El endpoint `/api/route` valida coordenadas, limita el ámbito a Zaragoza, mantiene una caché de cinco minutos y limita solicitudes por IP en memoria por instancia; en una app pública escalada, sustituye esto por rate limiting compartido. Llama solo al perfil `foot-walking`. La página de planes consultada el 16/10/2026 lista el Standard a 0 € con 2.000 rutas/día y 40/minuto; el dashboard de la cuenta prevalece. Consulta también [restricciones actuales](https://openrouteservice.org/restrictions/) y [documentación oficial de Directions](https://openrouteservice.org/dev/#/api-docs/v2/directions/{profile}/geojson/post). Límites y precios pueden cambiar. Ante falta de clave, cuota o error, se explica que la ruta no está disponible.
+
+La búsqueda se hace explícitamente mediante `/api/geocode` y Nominatim. No se envía la ubicación del navegador al geocodificador. La instancia pública de Nominatim tiene capacidad limitada (máximo publicado de una consulta por segundo) y prohíbe autocompletado. Para uso intensivo, contrata un proveedor o aloja una instancia propia.
+
+## Incidencias y privacidad
+
+Las incidencias se validan y guardan en localStorage. No se envían al Ayuntamiento, no son compartidas, no modifican el estado oficial y pueden borrarse al limpiar los datos del navegador. La ubicación no se guarda ni se envía a Fuentes Zaragoza; solo se transmite al proveedor de rutas cuando el usuario pide calcular una ruta. Véase `/privacidad`.
+
+## Despliegue en Vercel
+
+1. Importa el repositorio existente en Vercel y deja Framework Preset en Next.js.
+2. Añade `ORS_API_KEY` si quieres habilitar rutas (opcional).
+3. Usa Node.js 20.x o superior; el comando de build es `npm run build`.
+4. Despliega. La geolocalización funcionará bajo HTTPS.
+
+No se necesita configurar almacenamiento remoto. El snapshot local se empaqueta con la app. Verifica que el proveedor cartográfico y sus licencias aceptan tu volumen previsto; OSM estándar es para uso moderado y sin SLA.
+
+## Arquitectura
+
+- `app/`: rutas App Router, páginas de transparencia y endpoints de rutas/geocodificación.
+- `components/map-view.tsx`: mapa Leaflet cargado dinámicamente solo en cliente y marcadores agrupados.
+- `lib/data.ts`: validación, normalización, deduplicación, distancias y filtros.
+- `lib/geolocation.ts`, `lib/local-storage.ts`, `lib/validation.ts`: geolocalización, favoritos/incidencias y esquemas.
+- `data/`: snapshots municipal y OSM GeoJSON.
+- `scripts/update-data.ts`, `scripts/update-osm.ts`: actualizaciones reproducibles.
+- `tests/`: pruebas de datos, filtros, almacenamiento, permisos y proveedor de rutas.
+- `e2e/`: comprobación de viewport móvil/escritorio, permiso explícito de geolocalización y controles del mapa.
+
+## Mejoras futuras
+
+- Conciliar una importación puntual de etiquetas OSM con identificadores de origen y revisión manual de duplicados.
+- Añadir un endpoint de reporte compartido con moderación, rate limiting distribuido y almacenamiento protegido.
+- Mostrar límites municipales de parques para clasificar zonas verdes con geometría, en vez de inferirlos desde la ubicación textual.
+- Añadir alertas por antigüedad y una comprobación periódica de cambios en el WFS.
+- Evaluar un proveedor de teselas y geocodificación contratado si el uso supera el servicio público comunitario.
