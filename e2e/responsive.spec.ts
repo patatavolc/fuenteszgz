@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("mobile layout fits the viewport and geolocation is only requested after a tap", async ({ page }) => {
+test("mobile layout fits the viewport and requests geolocation on entry", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   let requests = 0;
   await page.addInitScript(() => {
@@ -15,12 +15,13 @@ test("mobile layout fits the viewport and geolocation is only requested after a 
   await page.route("https://tile.openstreetmap.org/**", (route) => route.abort());
   await page.goto("/");
   await expect(page.locator(".leaflet-container")).toBeVisible();
-  requests = await page.evaluate(() => (window as Window & { __geoRequests?: number }).__geoRequests ?? 0);
-  expect(requests).toBe(0);
-  await page.getByRole("button", { name: "Localizarme" }).first().click();
   await expect(page.locator(".location-status")).toContainText("Ubicación denegada");
   requests = await page.evaluate(() => (window as Window & { __geoRequests?: number }).__geoRequests ?? 0);
   expect(requests).toBe(1);
+  await page.getByRole("button", { name: "Localizarme" }).first().click();
+  await expect(page.locator(".location-status")).toContainText("Ubicación denegada");
+  requests = await page.evaluate(() => (window as Window & { __geoRequests?: number }).__geoRequests ?? 0);
+  expect(requests).toBe(2);
   const dimensions = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width);
   await expect(page.getByRole("textbox", { name: "Buscar dirección, parque o fuente" })).toBeVisible();

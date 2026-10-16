@@ -24,11 +24,12 @@ function useLocation() {
   const [point, setPoint] = useState<Point | null>(null);
   const [watching, setWatching] = useState(false);
   const [watchId, setWatchId] = useState<number | null>(null);
-  const locate = (onLocated?: (point: Point) => void) => {
+  const locate = useCallback((onLocated?: (point: Point) => void) => {
     if (!navigator.geolocation) { setState("no-disponible"); return; }
     setState("pendiente");
-    navigator.geolocation.getCurrentPosition(({ coords }) => { const value = { lat: coords.latitude, lon: coords.longitude }; setPoint(value); setState("concedida"); onLocated?.(value); }, ({ code }) => setState(geolocationStateFromError(code)), { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 });
-  };
+    navigator.geolocation.getCurrentPosition(({ coords }) => { const value = { lat: coords.latitude, lon: coords.longitude }; setPoint(value); setState("concedida"); onLocated?.(value); }, ({ code }) => setState(geolocationStateFromError(code)), { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
+  }, []);
+  useEffect(() => { locate(); }, [locate]);
   const toggleWatch = () => {
     if (watchId !== null) { navigator.geolocation.clearWatch(watchId); setWatchId(null); setWatching(false); return; }
     if (!navigator.geolocation) { setState("no-disponible"); return; }
@@ -150,7 +151,7 @@ export default function HomeClient() {
         </div>}
       </section>
       {notice && <div className="toast" role="status">{notice}<button aria-label="Cerrar aviso" onClick={() => setNotice("")}><X size={16}/></button></div>}
-      <div className="location-status" aria-live="polite">{location.state === "denegada" ? "Ubicación denegada. Puedes elegir el origen en el mapa." : location.state === "no-disponible" ? "Ubicación no disponible." : location.state === "pendiente" ? "Buscando ubicación…" : location.state === "concedida" ? "Ubicación disponible" : ""}</div>
+      <div className="location-status" aria-live="polite">{location.state === "denegada" ? "Ubicación denegada. Puedes elegir el origen en el mapa." : location.state === "no-disponible" ? "Ubicación no disponible." : location.state === "pendiente" ? "Buscando ubicación precisa…" : location.state === "concedida" ? "Ubicación disponible" : ""}</div>
     </div>
     <footer className="site-footer"><span><Droplets size={14}/> {municipalFountains.length} municipales + {osmFountains.length} candidatos OSM</span><Link href="/fuentes">Datos</Link><Link href="/privacidad">Privacidad</Link></footer>
   </main>;

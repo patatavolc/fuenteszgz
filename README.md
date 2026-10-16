@@ -32,14 +32,14 @@ npm run test:e2e
 
 En la revisión del proyecto, `npm audit --omit=dev` no reportó vulnerabilidades de producción. El audit completo sí señala 5 avisos altos en la cadena de herramientas de ESLint (`braces`/`micromatch` bajo `eslint-config-next`), instalada solo para desarrollo y lint; se deben reevaluar al actualizarla.
 
-La aplicación no necesita cuenta, base de datos ni clave para explorar los inventarios. La ubicación solo se solicita tras pulsar el control; en producción requiere HTTPS. Los favoritos e incidencias comunitarias son locales al navegador. El catálogo municipal autoriza la reutilización comercial y no comercial bajo condiciones de atribución, fecha y no respaldo institucional; véase el aviso municipal en la documentación.
+La aplicación no necesita cuenta, base de datos ni clave para explorar los inventarios. Al entrar se solicita permiso para usar la ubicación; si se deniega, se puede elegir el origen en el mapa. En producción requiere HTTPS. Los favoritos e incidencias comunitarias son locales al navegador. El catálogo municipal autoriza la reutilización comercial y no comercial bajo condiciones de atribución, fecha y no respaldo institucional; véase el aviso municipal en la documentación.
 
 ## Funciones
 
 - Mapa Leaflet con agrupación progresiva de marcadores, controles de zoom táctiles, atribución OSM y selección de fuente.
 - Resultados cercanos ordenados por distancia en línea recta; distancia siempre identificada como tal.
 - Búsqueda local en nombres/ubicaciones y búsqueda puntual de direcciones con Nominatim al enviar el formulario (sin autocompletado).
-- Geolocalización puntual y seguimiento explícito con botón para detenerlo. También se puede elegir origen tocando el mapa.
+- Solicitud de geolocalización al entrar, localización puntual y seguimiento explícito con botón para detenerlo. También se puede elegir origen tocando el mapa.
 - Filtros combinables de distancia, zonas verdes identificadas, estado y exclusión estacional cuando OSM aporta esa etiqueta. La ficha muestra accesibilidad solo cuando el dato existe.
 - Ficha con procedencia, estado disponible, favoritos locales, incidencias locales y enlaces a Google/Apple Maps.
 
