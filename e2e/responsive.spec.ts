@@ -46,6 +46,37 @@ test("desktop layout remains within the viewport and keeps map controls accessib
   expect(pageErrors).toEqual([]);
 });
 
+test("location and search share a row and the map legend opens on demand", async ({ page }) => {
+  await page.route("https://tile.openstreetmap.org/**", (route) => route.abort());
+  await page.goto("/");
+  const location = page.getByRole("button", { name: "Localizarme" });
+  const search = page.getByRole("textbox", { name: "Buscar dirección, parque o fuente" });
+  const legendToggle = page.getByRole("button", { name: "Colores del mapa" });
+  await expect(legendToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("#map-legend-panel")).toBeHidden();
+
+  for (const viewport of [{ width: 320, height: 720 }, { width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    await page.setViewportSize(viewport);
+    const [locationBox, searchBox] = await Promise.all([location.boundingBox(), search.boundingBox()]);
+    expect(locationBox, `location button at ${viewport.width}px`).not.toBeNull();
+    expect(searchBox, `search input at ${viewport.width}px`).not.toBeNull();
+    expect(locationBox!.width).toBeGreaterThanOrEqual(44);
+    expect(locationBox!.height).toBeGreaterThanOrEqual(44);
+    expect(Math.abs((locationBox!.y + locationBox!.height / 2) - (searchBox!.y + searchBox!.height / 2)), `vertical alignment at ${viewport.width}px`).toBeLessThan(12);
+    expect(locationBox!.x + locationBox!.width).toBeLessThan(searchBox!.x + 2);
+    const dimensions = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
+    expect(dimensions.scrollWidth, `horizontal overflow at ${viewport.width}px`).toBeLessThanOrEqual(dimensions.width);
+  }
+
+  await page.getByRole("button", { name: "Colores del mapa" }).click();
+  const legend = page.getByRole("region", { name: "Significado de los colores del mapa" });
+  await expect(legend).toBeVisible();
+  await expect(legend.locator(".legend-dot")).toHaveCount(3);
+  await expect(page.getByRole("button", { name: "Ocultar leyenda" })).toHaveAttribute("aria-expanded", "true");
+  await page.getByRole("button", { name: "Ocultar leyenda" }).click();
+  await expect(legend).toBeHidden();
+});
+
 test("search, filters, fountain details and favorites work on mobile and desktop", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {
