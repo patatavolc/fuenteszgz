@@ -1,10 +1,12 @@
 export type Point = { lat: number; lon: number };
 export type OperatingStatus = "operativa" | "averiada" | "cerrada" | "fuera-de-servicio" | "desconocida";
-export type Provenance = "Ayuntamiento de Zaragoza" | "OpenStreetMap (comunidad)";
+export type Provenance = "Ayuntamiento de Zaragoza" | "OpenStreetMap (comunidad)" | "Fuente propuesta (comunidad)";
 
 export type Fountain = Point & {
   id: string;
   name: string;
+  /** Official source code, kept as secondary metadata rather than the public label. */
+  officialCode?: string;
   address?: string;
   location?: string;
   district?: string;
@@ -20,6 +22,18 @@ export type Fountain = Point & {
   confidence: "alta" | "media";
   osmTags?: Record<string, string>;
   matchedOsm?: Fountain[];
+  communityStatus?: "pending" | "approved" | "rejected";
+  description?: string;
+};
+
+export type CommunitySourceStatus = "pending" | "approved" | "rejected";
+export type CommunitySource = Point & {
+  id: string;
+  name: string | null;
+  location: string | null;
+  description: string | null;
+  status: CommunitySourceStatus;
+  createdAt: string;
 };
 
 export type IncidentKind = "averiada" | "cerrada" | "inaccesible" | "informacion-incorrecta";
