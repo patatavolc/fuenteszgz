@@ -13,8 +13,8 @@ function Recenter({ point }: { point: Point | null }) {
   useEffect(() => { if (point) map.flyTo([point.lat, point.lon], Math.max(map.getZoom(), 16), { duration: 0.6 }); }, [point, map]);
   return null;
 }
-function ClickOrigin({ enabled, onClick }: { enabled: boolean; onClick: (point: Point) => void }) {
-  useMapEvents({ click(event) { if (enabled) onClick({ lat: event.latlng.lat, lon: event.latlng.lng }); } });
+function ClickOrigin({ enabled, onClick, selectingSource, onSourcePoint }: { enabled: boolean; onClick: (point: Point) => void; selectingSource: boolean; onSourcePoint: (point: Point) => void }) {
+  useMapEvents({ click(event) { const point = { lat: event.latlng.lat, lon: event.latlng.lng }; if (selectingSource) onSourcePoint(point); else if (enabled) onClick(point); } });
   return null;
 }
 const fountainIcon = (status: Fountain["status"], community: boolean) => {
@@ -44,8 +44,8 @@ function ClusteredFountains({ fountains, onSelect }: { fountains: Fountain[]; on
   useEffect(() => {
     const group = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 42, showCoverageOnHover: false });
     fountains.forEach((fountain) => {
-      const community = fountain.source === "OpenStreetMap (comunidad)";
-      const sourceLabel = community ? "OpenStreetMap, comunidad" : "Ayuntamiento de Zaragoza";
+      const community = fountain.source !== "Ayuntamiento de Zaragoza";
+      const sourceLabel = fountain.source === "OpenStreetMap (comunidad)" ? "OpenStreetMap, comunidad" : fountain.source === "Ayuntamiento de Zaragoza" ? "Ayuntamiento de Zaragoza" : "propuesta comunitaria aprobada";
       const accessibleLabel = `${fountain.name}, ${statusLabel(fountain.status)}, ${sourceLabel}`;
       const marker = L.marker([fountain.lat, fountain.lon], { icon: fountainIcon(fountain.status, community), title: accessibleLabel, alt: accessibleLabel, keyboard: true });
       marker.bindTooltip(`${fountain.name} · ${statusLabel(fountain.status)} · ${sourceLabel}`, { direction: "top", offset: [0, -4] });
@@ -58,16 +58,16 @@ function ClusteredFountains({ fountains, onSelect }: { fountains: Fountain[]; on
   return null;
 }
 
-export function MapView({ fountains, selectedId, userPoint, origin, recenter, chooseOrigin, onSelect, selectingOrigin }: {
+export function MapView({ fountains, selectedId, userPoint, origin, recenter, chooseOrigin, onSelect, selectingOrigin, selectingSource = false, onSourcePoint = () => {} }: {
   fountains: Fountain[]; selectedId?: string; userPoint?: Point | null; origin?: Point | null;
-  recenter?: Point | null; chooseOrigin: (point: Point) => void; onSelect: (fountain: Fountain) => void; selectingOrigin: boolean;
+  recenter?: Point | null; chooseOrigin: (point: Point) => void; onSelect: (fountain: Fountain) => void; selectingOrigin: boolean; selectingSource?: boolean; onSourcePoint?: (point: Point) => void;
 }) {
   const selected = fountains.find((item) => item.id === selectedId);
   return <MapContainer center={[41.6488, -0.8891]} zoom={13} zoomControl={false} scrollWheelZoom keyboard className="map-canvas">
     <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a>' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
     <ZoomControl position="bottomright"/>
     <Recenter point={recenter ?? (selected ? selected : null)} />
-    <ClickOrigin enabled={selectingOrigin} onClick={chooseOrigin} />
+    <ClickOrigin enabled={selectingOrigin} onClick={chooseOrigin} selectingSource={selectingSource} onSourcePoint={onSourcePoint} />
     <ClusteredFountains fountains={fountains} onSelect={onSelect}/>
     {userPoint && <CircleMarker center={[userPoint.lat, userPoint.lon]} radius={9} pathOptions={{ color: "white", weight: 3, fillColor: "#2476ff", fillOpacity: 1 }} />}
     {origin && <Marker position={[origin.lat, origin.lon]} icon={userIcon} title="Origen seleccionado" />}
