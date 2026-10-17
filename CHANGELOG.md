@@ -1,5 +1,10 @@
 # Cambios
 
+## Sin publicar
+
+- Los registros municipales prevalecen sobre candidatos OSM que coinciden con evidencia de calle/ubicación y proximidad única; la ficha conserva la referencia comunitaria.
+- Ajustes de accesibilidad y diseño responsivo, con cobertura de navegador para filtros, búsqueda, detalles, favoritos y tamaños móvil/escritorio.
+
 ## 0.1.0 — 2026-10-16
 
 - Inicio del proyecto personal Fuentes Zaragoza.

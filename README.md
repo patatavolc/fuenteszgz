@@ -36,7 +36,7 @@ La aplicación no necesita cuenta, base de datos ni clave para explorar los inve
 
 ## Funciones
 
-- Mapa Leaflet con agrupación progresiva de marcadores, controles de zoom táctiles, atribución OSM y selección de fuente.
+- Mapa Leaflet con agrupación progresiva de marcadores, controles de zoom táctiles, atribución OSM y selección de fuente. Las coincidencias fiables aparecen con pin municipal y la referencia comunitaria queda enlazada en la ficha.
 - Resultados cercanos ordenados por distancia en línea recta; distancia siempre identificada como tal.
 - Búsqueda local en nombres/ubicaciones y búsqueda puntual de direcciones con Nominatim al enviar el formulario (sin autocompletado).
 - Solicitud de geolocalización al entrar, localización puntual y seguimiento explícito con botón para detenerlo. También se puede elegir origen tocando el mapa.
@@ -47,7 +47,7 @@ La aplicación no necesita cuenta, base de datos ni clave para explorar los inve
 
 El inventario procede del [catálogo municipal de Fuentes de agua para beber](https://www.zaragoza.es/web/espacio-de-datos/servicio/catalogo/2860), con capa WFS IDEZar `medioambiente:fuente_agua_potable`. La ficha describe 697 elementos y última actualización 13/07/2023. En la consulta del 16/10/2026 el WFS anunció 653; se pudieron recuperar 650 geometrías en EPSG:4326 tras errores de reproyección en tres índices. No se afirma que la cobertura sea completa. `en_servicio` se presenta como dato del Ayuntamiento, no como garantía de que la fuente funcione hoy. No hay fecha de inspección individual.
 
-OpenStreetMap aporta también 523 candidatos comunitarios consultados el 16/10/2026 mediante Overpass. Se muestran diferenciados de las fuentes municipales y como no confirmados oficialmente. La consulta selecciona `amenity=drinking_water` y otras etiquetas explícitas de agua potable; excluye elementos etiquetados con acceso privado/no. Sus teselas y datos requieren atribución OSM y están bajo sus condiciones (ODbL para la base de datos). Las teselas estándar son de mejor esfuerzo y no ofrecen capacidad ilimitada; el mapa solo pide teselas visibles, sin descarga offline ni precarga. Para cargas elevadas debe configurarse un proveedor compatible.
+OpenStreetMap aporta también 523 candidatos comunitarios consultados el 16/10/2026 mediante Overpass. Los candidatos sin coincidencia fiable se muestran diferenciados de las fuentes municipales y como no confirmados oficialmente; las coincidencias fiables se agrupan bajo el registro municipal y conservan un enlace al dato OSM en la ficha. La consulta selecciona `amenity=drinking_water` y otras etiquetas explícitas de agua potable; excluye elementos etiquetados con acceso privado/no. Sus teselas y datos requieren atribución OSM y están bajo sus condiciones (ODbL para la base de datos). Las teselas estándar son de mejor esfuerzo y no ofrecen capacidad ilimitada; el mapa solo pide teselas visibles, sin descarga offline ni precarga. Para cargas elevadas debe configurarse un proveedor compatible.
 
 Consulta [Fuentes, licencias y límites](docs/FUENTES-DE-DATOS.md) y la página `/fuentes` en la aplicación. Este producto no es información de emergencia; comprueba la fuente en el lugar.
 

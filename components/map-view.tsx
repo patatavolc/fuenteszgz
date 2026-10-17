@@ -24,7 +24,8 @@ function ClusteredFountains({ fountains, onSelect }: { fountains: Fountain[]; on
     const group = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 42, showCoverageOnHover: false });
     fountains.forEach((fountain) => {
       const community = fountain.source === "OpenStreetMap (comunidad)";
-      const marker = L.marker([fountain.lat, fountain.lon], { icon: fountainIcon(fountain.status, community), title: `${fountain.name} · ${community ? "OSM" : "Ayuntamiento"}`, alt: fountain.name });
+      const sourceLabel = community ? "OpenStreetMap, comunidad" : "Ayuntamiento de Zaragoza";
+      const marker = L.marker([fountain.lat, fountain.lon], { icon: fountainIcon(fountain.status, community), title: `${fountain.name} · ${sourceLabel}`, alt: `${fountain.name}, ${sourceLabel}`, keyboard: true });
       marker.bindTooltip(fountain.name, { direction: "top", offset: [0, -30] });
       marker.on("click", () => onSelect(fountain));
       group.addLayer(marker);

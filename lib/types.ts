@@ -19,6 +19,7 @@ export type Fountain = Point & {
   sourceUpdatedAt?: string;
   confidence: "alta" | "media";
   osmTags?: Record<string, string>;
+  matchedOsm?: Fountain[];
 };
 
 export type IncidentKind = "averiada" | "cerrada" | "inaccesible" | "informacion-incorrecta";
