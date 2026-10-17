@@ -6,7 +6,6 @@ import "leaflet.markercluster";
 import L from "leaflet";
 import type { Fountain, Point } from "@/lib/types";
 
-const fountainIcon = (status: string, community: boolean) => L.divIcon({ className: "", html: `<span class="map-pin ${community ? "pin-community" : status === "averiada" || status === "cerrada" || status === "fuera-de-servicio" ? "pin-off" : status === "desconocida" ? "pin-unknown" : ""}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8c-3.2 4.2-6.2 7.5-6.2 11.4a6.2 6.2 0 0 0 12.4 0C18.2 10.3 15.2 7 12 2.8Z"/><path d="M9.1 15a3 3 0 0 0 3 2.7"/></svg></span>`, iconSize: [34, 42], iconAnchor: [17, 40], popupAnchor: [0, -36] });
 const userIcon = L.divIcon({ className: "", html: '<span class="user-pin"><i></i></span>', iconSize: [22, 22], iconAnchor: [11, 11] });
 
 function Recenter({ point }: { point: Point | null }) {
@@ -18,6 +17,28 @@ function ClickOrigin({ enabled, onClick }: { enabled: boolean; onClick: (point: 
   useMapEvents({ click(event) { if (enabled) onClick({ lat: event.latlng.lat, lon: event.latlng.lng }); } });
   return null;
 }
+const fountainIcon = (status: Fountain["status"], community: boolean) => {
+  const statusClass = status === "averiada" || status === "cerrada" || status === "fuera-de-servicio"
+    ? "pin-off"
+    : status === "desconocida" ? "pin-unknown" : "";
+  return L.divIcon({
+    className: "fountain-marker-icon",
+    html: `<span class="map-pin ${community ? "pin-community" : statusClass}" aria-hidden="true"><i></i></span>`,
+    iconSize: [38, 38],
+    // The rotated pin's tip sits at the bottom center of the icon box.
+    iconAnchor: [19, 37],
+    tooltipAnchor: [0, -35],
+  });
+};
+
+const statusLabel = (status: Fountain["status"]) => ({
+  operativa: "operativa",
+  averiada: "averiada",
+  cerrada: "cerrada",
+  "fuera-de-servicio": "fuera de servicio",
+  desconocida: "estado desconocido",
+}[status]);
+
 function ClusteredFountains({ fountains, onSelect }: { fountains: Fountain[]; onSelect: (fountain: Fountain) => void }) {
   const map = useMap();
   useEffect(() => {
@@ -25,8 +46,9 @@ function ClusteredFountains({ fountains, onSelect }: { fountains: Fountain[]; on
     fountains.forEach((fountain) => {
       const community = fountain.source === "OpenStreetMap (comunidad)";
       const sourceLabel = community ? "OpenStreetMap, comunidad" : "Ayuntamiento de Zaragoza";
-      const marker = L.marker([fountain.lat, fountain.lon], { icon: fountainIcon(fountain.status, community), title: `${fountain.name} · ${sourceLabel}`, alt: `${fountain.name}, ${sourceLabel}`, keyboard: true });
-      marker.bindTooltip(fountain.name, { direction: "top", offset: [0, -30] });
+      const accessibleLabel = `${fountain.name}, ${statusLabel(fountain.status)}, ${sourceLabel}`;
+      const marker = L.marker([fountain.lat, fountain.lon], { icon: fountainIcon(fountain.status, community), title: accessibleLabel, alt: accessibleLabel, keyboard: true });
+      marker.bindTooltip(`${fountain.name} · ${statusLabel(fountain.status)} · ${sourceLabel}`, { direction: "top", offset: [0, -4] });
       marker.on("click", () => onSelect(fountain));
       group.addLayer(marker);
     });
