@@ -1,5 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { formatSnapshotValidationReport, meetsSnapshotCoverage, validateSnapshot } from "../lib/snapshot-validation";
 
 const endpoint = "https://idezar-sig.zaragoza.es/servicios/geoserver/medioambiente/wfs";
 const input = resolve("data/municipal-snapshot.geojson");
@@ -35,12 +36,17 @@ async function main() {
     features.push(...page);
     if (!page.length || (total > 0 && start + 100 >= total)) break;
   }
+  const result = { type: "FeatureCollection", name: "Fuentes de agua potable — Ayuntamiento de Zaragoza", timestamp: sourceTimestamp ?? new Date().toISOString(), crs: { type: "name", properties: { name: "EPSG:4326" } }, features };
+  const validation = validateSnapshot(result, "municipal");
+  console.info(formatSnapshotValidationReport(validation.report));
   if (!total || features.length < total * 0.95) {
     throw new Error(`Descarga incompleta: recibidos ${features.length} de ${total || "un total desconocido"}. No se reemplazó el snapshot.`);
   }
-  const result = { type: "FeatureCollection", name: "Fuentes de agua potable — Ayuntamiento de Zaragoza", timestamp: sourceTimestamp ?? new Date().toISOString(), crs: { type: "name", properties: { name: "EPSG:4326" } }, features };
-  await writeFile(input, `${JSON.stringify(result)}\n`, "utf8");
-  console.info(`Snapshot actualizado: ${features.length} registros WFS; ${new Date().toISOString()}`);
+  if (!meetsSnapshotCoverage(validation.report.accepted, total)) {
+    throw new Error(`Descarga incompleta tras validar: ${validation.report.accepted} registros válidos de ${total}. No se reemplazó el snapshot.`);
+  }
+  await writeFile(input, `${JSON.stringify({ ...result, features: validation.features })}\n`, "utf8");
+  console.info(`Snapshot actualizado: ${validation.report.accepted} registros WFS válidos; ${new Date().toISOString()}`);
 }
 
 main().catch((error: unknown) => {
