@@ -39,7 +39,7 @@ La aplicación no necesita cuenta, base de datos ni clave para explorar los inve
 - Mapa Leaflet con agrupación progresiva de marcadores, controles de zoom táctiles, atribución OSM y selección de fuente. Las coincidencias fiables aparecen con pin municipal y la referencia comunitaria queda enlazada en la ficha.
 - Resultados cercanos ordenados por distancia en línea recta; distancia siempre identificada como tal.
 - Búsqueda local en nombres/ubicaciones y búsqueda puntual de direcciones con Nominatim al enviar el formulario (sin autocompletado).
-- Seguimiento continuo de ubicación al pulsar el botón, con opción para detenerlo. También se puede elegir origen tocando el mapa.
+- Localización puntual bajo demanda. También se puede elegir origen tocando el mapa.
 - Filtros combinables de distancia, zonas verdes identificadas, estado y exclusión estacional cuando OSM aporta esa etiqueta. La ficha muestra accesibilidad solo cuando el dato existe.
 - Ficha con procedencia, estado disponible, favoritos locales, incidencias locales y enlaces a Google/Apple Maps.
 - Formulario para proponer una fuente. Las propuestas se almacenan como pendientes de revisión y nunca se añaden automáticamente al mapa.

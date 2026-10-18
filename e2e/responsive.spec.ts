@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("mobile layout fits the viewport and requests geolocation on entry", async ({ page }) => {
+test("mobile layout keeps geolocation opt-in and controls accessible", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   let requests = 0;
   await page.addInitScript(() => {
@@ -15,13 +15,27 @@ test("mobile layout fits the viewport and requests geolocation on entry", async 
   await page.route("https://tile.openstreetmap.org/**", (route) => route.abort());
   await page.goto("/");
   await expect(page.locator(".leaflet-container")).toBeVisible();
-  await expect(page.locator(".location-status")).toContainText("Ubicación denegada");
   requests = await page.evaluate(() => (window as Window & { __geoRequests?: number }).__geoRequests ?? 0);
-  expect(requests).toBe(1);
+  expect(requests).toBe(0);
   await page.getByRole("button", { name: "Localizarme" }).first().click();
   await expect(page.locator(".location-status")).toContainText("Ubicación denegada");
   requests = await page.evaluate(() => (window as Window & { __geoRequests?: number }).__geoRequests ?? 0);
-  expect(requests).toBe(2);
+  expect(requests).toBe(1);
+  const list = page.getByRole("list");
+  await expect(list.getByRole("listitem").first().getByRole("button")).toBeVisible();
+  const collapse = page.getByRole("button", { name: "Ocultar resultados" });
+  await collapse.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("button", { name: "Mostrar resultados" })).toHaveAttribute("aria-expanded", "false");
+  await page.keyboard.press("Space");
+  await expect(page.getByRole("button", { name: "Ocultar resultados" })).toHaveAttribute("aria-expanded", "true");
+  const collapseBox = await collapse.boundingBox();
+  if (!collapseBox) throw new Error("Collapse control is not visible");
+  await page.mouse.move(collapseBox.x + collapseBox.width / 2, collapseBox.y + collapseBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(collapseBox.x + collapseBox.width / 2, collapseBox.y + collapseBox.height / 2 + 60);
+  await page.mouse.up();
+  await expect(page.getByRole("button", { name: "Mostrar resultados" })).toHaveAttribute("aria-expanded", "false");
   const dimensions = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width);
   await expect(page.getByRole("textbox", { name: "Buscar dirección, parque o fuente" })).toBeVisible();
