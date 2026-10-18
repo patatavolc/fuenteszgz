@@ -55,6 +55,8 @@ export default function HomeClient() {
   const [notice, setNotice] = useState("");
   const [recenter, setRecenter] = useState<Point | null>(null);
   const lastGeocodeAt = useRef(0);
+  const sheetDragStart = useRef<number | null>(null);
+  const sheetDragged = useRef(false);
 
   useEffect(() => { setFavoriteIds(getFavorites()); setIncidents(getIncidents()); }, []);
 
@@ -118,7 +120,12 @@ export default function HomeClient() {
       <div className="map-legend" aria-label="Leyenda del mapa"><span><i className="legend-dot"/> Ayuntamiento</span><span><i className="legend-dot community"/> OSM · sin coincidencia municipal</span><span><i className="legend-dot unknown"/> Estado desconocido</span></div>
       <div className="attribution-note">Mapa © OpenStreetMap · <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noreferrer">Informar de un error</a></div>
       <section className={`bottom-sheet ${selected ? "has-selection" : ""} ${sheetCollapsed ? "collapsed" : ""}`} aria-label="Resultados de fuentes">
-        <div className="sheet-handle" aria-label="Arrastra para plegar o mostrar la tarjeta" onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); event.currentTarget.dataset.startY = String(event.clientY); }} onPointerUp={(event) => { const startY = Number(event.currentTarget.dataset.startY); const delta = event.clientY - startY; if (delta > 40) setSheetCollapsed(true); else if (delta < -40) setSheetCollapsed(false); }} /><div className="sheet-header"><div><span className="eyebrow">{tab === "favoritos" ? "TUS PUNTOS GUARDADOS" : "CERCA DE TI"}</span><h1>{selected ? selected.name : `${visibleResults.length} fuentes`}</h1><p>{selected ? selected.location ?? selected.address ?? "Zaragoza" : `Desde ${location.point ? "tu ubicación" : actualOrigin.label}`}</p></div><button className="collapse-button" onClick={() => setSheetCollapsed((value) => !value)} aria-label={sheetCollapsed ? "Mostrar resultados" : "Ocultar resultados"} aria-expanded={!sheetCollapsed}><ChevronDown size={18}/></button></div>
+        <button type="button" className="sheet-handle" aria-label={sheetCollapsed ? "Desplegar resultados" : "Plegar resultados"} aria-expanded={!sheetCollapsed}
+          onClick={() => { if (sheetDragged.current) { sheetDragged.current = false; return; } setSheetCollapsed((value) => !value); }}
+          onPointerDown={(event) => { sheetDragStart.current = event.clientY; sheetDragged.current = false; event.currentTarget.setPointerCapture(event.pointerId); }}
+          onPointerUp={(event) => { if (sheetDragStart.current === null) return; const delta = event.clientY - sheetDragStart.current; sheetDragStart.current = null; if (Math.abs(delta) > 35) { sheetDragged.current = true; setSheetCollapsed(delta > 0); } }}
+          onPointerCancel={() => { sheetDragStart.current = null; }} />
+        <div className="sheet-header"><div><span className="eyebrow">{tab === "favoritos" ? "TUS PUNTOS GUARDADOS" : "CERCA DE TI"}</span><h1>{selected ? selected.name : `${visibleResults.length} fuentes`}</h1><p>{selected ? selected.location ?? selected.address ?? "Zaragoza" : `Desde ${location.point ? "tu ubicación" : actualOrigin.label}`}</p></div><button className="collapse-button" onClick={() => setSheetCollapsed((value) => !value)} aria-label={sheetCollapsed ? "Mostrar resultados" : "Ocultar resultados"} aria-expanded={!sheetCollapsed}><ChevronDown size={18}/></button></div>
         {!selected ? <>
           <nav className="tabs" aria-label="Vistas"><button className={tab !== "favoritos" ? "selected" : ""} aria-pressed={tab !== "favoritos"} onClick={() => setTab("mapa")}><MapPin size={16}/> Cercanas</button><button className={tab === "favoritos" ? "selected" : ""} aria-pressed={tab === "favoritos"} onClick={() => { setFavoriteIds(getFavorites()); setTab("favoritos"); }}><Bookmark size={15}/> Favoritos {favoriteIds.length > 0 && <span className="count-badge">{favoriteIds.length}</span>}</button></nav>
           <div className="list-meta"><span>En línea recta · ordenadas por distancia</span><button onClick={() => { setRecenter(location.point ?? origin); }}><Compass size={15}/> Centrar</button></div>
