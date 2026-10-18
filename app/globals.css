@@ -14,8 +14,8 @@ button,a,input,select,textarea{touch-action:manipulation}button:focus-visible,a:
 
 .bottom-sheet.collapsed{max-height:104px;overflow:hidden}
 .topbar{justify-content:flex-end}
-.sheet-handle{touch-action:none;cursor:grab}
-.sheet-handle:active{cursor:grabbing}
+.collapse-button{touch-action:none;cursor:grab}
+.collapse-button:active{cursor:grabbing}
 .bottom-sheet.collapsed .sheet-header{align-items:center}
 .bottom-sheet.collapsed .collapse-button{transform:rotate(180deg)}
 .bottom-sheet.collapsed>.tabs,.bottom-sheet.collapsed>.list-meta,.bottom-sheet.collapsed>.results-list,.bottom-sheet.collapsed>.detail-content{display:none}

@@ -29,6 +29,13 @@ test("mobile layout keeps geolocation opt-in and controls accessible", async ({ 
   await expect(page.getByRole("button", { name: "Mostrar resultados" })).toHaveAttribute("aria-expanded", "false");
   await page.keyboard.press("Space");
   await expect(page.getByRole("button", { name: "Ocultar resultados" })).toHaveAttribute("aria-expanded", "true");
+  const collapseBox = await collapse.boundingBox();
+  if (!collapseBox) throw new Error("Collapse control is not visible");
+  await page.mouse.move(collapseBox.x + collapseBox.width / 2, collapseBox.y + collapseBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(collapseBox.x + collapseBox.width / 2, collapseBox.y + collapseBox.height / 2 + 60);
+  await page.mouse.up();
+  await expect(page.getByRole("button", { name: "Mostrar resultados" })).toHaveAttribute("aria-expanded", "false");
   const dimensions = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width);
   await expect(page.getByRole("textbox", { name: "Buscar dirección, parque o fuente" })).toBeVisible();
