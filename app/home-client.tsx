@@ -22,13 +22,32 @@ const statusText = (fountain: Fountain) => fountain.source === "OpenStreetMap (c
 function useLocation() {
   const [state, setState] = useState<GeolocationState>("sin-solicitar");
   const [point, setPoint] = useState<Point | null>(null);
-  const locate = useCallback((onLocated?: (point: Point) => void) => {
+  const [following, setFollowing] = useState(false);
+  const watchId = useRef<number | null>(null);
+  const stopFollowing = useCallback(() => {
+    if (watchId.current !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId.current);
+    watchId.current = null;
+    setFollowing(false);
+  }, []);
+  const toggleFollowing = useCallback((onLocated?: (point: Point) => void) => {
+    if (watchId.current !== null) { stopFollowing(); return; }
     if (!navigator.geolocation) { setState("no-disponible"); return; }
     setState("pendiente");
-    navigator.geolocation.getCurrentPosition(({ coords }) => { const value = { lat: coords.latitude, lon: coords.longitude }; setPoint(value); setState("concedida"); onLocated?.(value); }, ({ code }) => setState(geolocationStateFromError(code)), { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
+    setFollowing(true);
+    watchId.current = navigator.geolocation.watchPosition(({ coords }) => {
+      const value = { lat: coords.latitude, lon: coords.longitude };
+      setPoint(value);
+      setState("concedida");
+      onLocated?.(value);
+    }, ({ code }) => {
+      setState(geolocationStateFromError(code));
+      if (code === 1) stopFollowing();
+    }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
+  }, [stopFollowing]);
+  useEffect(() => () => {
+    if (watchId.current !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId.current);
   }, []);
-  useEffect(() => { locate(); }, [locate]);
-  return { state, point, locate };
+  return { state, point, following, toggleFollowing };
 }
 
 export default function HomeClient() {
@@ -66,9 +85,10 @@ export default function HomeClient() {
   const mapFountains = useMemo(() => visibleResults.map((entry) => entry.fountain), [visibleResults]);
   const activeFilterCount = Number(maxKm < 8) + Number(greenOnly) + Number(excludeSeasonal) + Number(statusFilter !== "todas");
 
-  const startGeolocation = () => {
+  const toggleGeolocation = () => {
+    if (location.following) { location.toggleFollowing(); return; }
     setHasChosenOrigin(false);
-    location.locate(setRecenter);
+    location.toggleFollowing(setRecenter);
   };
   const useMapOrigin = (point: Point) => { setOrigin({ ...point, label: "Punto elegido en el mapa" }); setHasChosenOrigin(true); setSelectingOrigin(false); };
   const chooseFountain = useCallback((fountain: Fountain) => { setSelected(fountain); setRecenter(fountain); }, []);
@@ -106,7 +126,7 @@ export default function HomeClient() {
     <div className="map-region" aria-label="Mapa de fuentes públicas de agua">
       <MapView fountains={mapFountains} selectedId={selected?.id} userPoint={location.point} origin={hasChosenOrigin ? origin : null} recenter={recenter} chooseOrigin={useMapOrigin} onSelect={chooseFountain} selectingOrigin={selectingOrigin}/>
       <header className="topbar">
-        <button className="icon-button location-button" onClick={startGeolocation} aria-label="Localizarme" title="Localizarme"><LocateFixed size={21}/></button>
+        <button className="icon-button location-button" onClick={toggleGeolocation} aria-label={location.following ? "Dejar de seguir mi ubicación" : "Seguir mi ubicación"} title={location.following ? "Dejar de seguir" : "Seguir mi ubicación"} aria-pressed={location.following}><LocateFixed size={21}/></button>
       </header>
       <section className="search-box" aria-label="Buscar un lugar">
         <form onSubmit={searchAddress}><Search size={18} aria-hidden="true"/><input value={searchText} onChange={(event) => { setSearchText(event.target.value); setSearchError(""); }} placeholder="Dirección, parque o fuente" aria-label="Buscar dirección, parque o fuente"/><button type="submit" disabled={geocoding} aria-label="Buscar">{geocoding ? <span className="tiny-spinner"/> : <Navigation size={17}/>}</button></form>
