@@ -1,6 +1,6 @@
-import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { formatSnapshotValidationReport, meetsSnapshotCoverage, validateSnapshot } from "../lib/snapshot-validation";
+import { formatSnapshotValidationReport, validateSnapshot } from "../lib/snapshot-validation";
+import { writeValidatedSnapshotAtomically } from "./write-snapshot";
 
 const endpoint = "https://idezar-sig.zaragoza.es/servicios/geoserver/medioambiente/wfs";
 const input = resolve("data/municipal-snapshot.geojson");
@@ -42,10 +42,7 @@ async function main() {
   if (!total || features.length < total * 0.95) {
     throw new Error(`Descarga incompleta: recibidos ${features.length} de ${total || "un total desconocido"}. No se reemplazó el snapshot.`);
   }
-  if (!meetsSnapshotCoverage(validation.report.accepted, total)) {
-    throw new Error(`Descarga incompleta tras validar: ${validation.report.accepted} registros válidos de ${total}. No se reemplazó el snapshot.`);
-  }
-  await writeFile(input, `${JSON.stringify({ ...result, features: validation.features })}\n`, "utf8");
+  await writeValidatedSnapshotAtomically(input, result, validation, { expected: total });
   console.info(`Snapshot actualizado: ${validation.report.accepted} registros WFS válidos; ${new Date().toISOString()}`);
 }
 
