@@ -1,5 +1,9 @@
 # Fuentes, licencias y límites del inventario
 
+## Propuestas comunitarias
+
+El formulario de propuesta requiere configuración opcional de Supabase. Sin ella no se guardan propuestas y la interfaz lo indica claramente. La migración `supabase/migrations/20261018000000_fountain_proposals.sql` crea una tabla con inserción anónima restringida a estado `pending`, sin lectura, edición ni borrado públicos. La revisión se realiza manualmente desde Supabase. Las propuestas, incluso las aprobadas, no se incorporan automáticamente al inventario ni al mapa; deben verificarse y añadirse explícitamente al snapshot mantenido en el repositorio.
+
 Consulta realizada el **16 de octubre de 2026**.
 
 ## Ayuntamiento de Zaragoza (fuente principal)
