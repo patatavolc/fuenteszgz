@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deduplicateFountains, distanceMeters, findNearby, normalizeMunicipalData, normalizeOsmData } from "@/lib/data";
+import { buildPrioritizedDisplaySet, deduplicateFountains, distanceMeters, findNearby, normalizeMunicipalData, normalizeOsmData } from "@/lib/data";
 import type { Fountain } from "@/lib/types";
 
 const fountain = (id: string, lat: number, lon: number, overrides: Partial<Fountain> = {}): Fountain => ({
@@ -40,6 +40,42 @@ describe("normalización municipal", () => {
 });
 
 describe("distancias, orden y filtros", () => {
+  it("prioriza el registro municipal y adjunta el OSM con calle coincidente", () => {
+    const city = fountain("municipal:F1", 41.65, -.88, { address: "CALLE CALLE MAYOR (00012) 10" });
+    const community = fountain("osm:node/1", 41.65001, -.88, {
+      source: "OpenStreetMap (comunidad)", address: "Calle Mayor 10", osmTags: { "addr:street": "Calle Mayor", amenity: "drinking_water" },
+    });
+    const display = buildPrioritizedDisplaySet([city], [community]);
+    expect(display).toHaveLength(1);
+    expect(display[0]).toMatchObject({ id: city.id, source: "Ayuntamiento de Zaragoza", matchedOsm: [{ id: community.id }] });
+  });
+
+  it("conserva como pines separados los candidatos cercanos sin evidencia común", () => {
+    const city = fountain("municipal:F1", 41.65, -.88, { address: "Calle Mayor 10" });
+    const community = fountain("osm:node/1", 41.65001, -.88, {
+      source: "OpenStreetMap (comunidad)", address: "Calle Nueva 10", osmTags: { "addr:street": "Calle Nueva" },
+    });
+    expect(buildPrioritizedDisplaySet([city], [community]).map(({ id }) => id)).toEqual([city.id, community.id]);
+  });
+
+  it("deja separadas las relaciones ambiguas y mantiene candidatos OSM no emparejados", () => {
+    const city = fountain("municipal:F1", 41.65, -.88, { address: "Calle Mayor 10" });
+    const osmA = fountain("osm:node/1", 41.65001, -.88, { source: "OpenStreetMap (comunidad)", address: "Calle Mayor 10", osmTags: { "addr:street": "Calle Mayor" } });
+    const osmB = fountain("osm:node/2", 41.65001, -.88, { source: "OpenStreetMap (comunidad)", address: "Calle Mayor 10", osmTags: { "addr:street": "Calle Mayor" } });
+    const display = buildPrioritizedDisplaySet([city], [osmA, osmB]);
+    expect(display.map(({ id }) => id)).toEqual([city.id, osmA.id, osmB.id]);
+    expect(display[0].matchedOsm).toBeUndefined();
+  });
+
+  it("usa la etiqueta estacional comunitaria solo como evidencia del filtro, sin reemplazar el registro municipal", () => {
+    const city = fountain("municipal:F1", 41.65, -.88, { location: "Parque del Agua" });
+    const community = fountain("osm:node/1", 41.65001, -.88, { source: "OpenStreetMap (comunidad)", location: "Parque del Agua", seasonal: "summer" });
+    const [prioritized] = buildPrioritizedDisplaySet([city], [community]);
+    const results = findNearby([prioritized], { lat: 41.65, lon: -.88 }, { maxDistanceKm: 1, greenOnly: false, status: "todas", excludeSeasonal: true });
+    expect(prioritized.source).toBe("Ayuntamiento de Zaragoza");
+    expect(results).toHaveLength(0);
+  });
+
   it("calcula distancia geodésica y ordena los resultados más cercanos", () => {
     const origin = { lat: 41.65, lon: -.88 };
     expect(distanceMeters(origin, { lat: 41.651, lon: -.88 })).toBeGreaterThan(100);
