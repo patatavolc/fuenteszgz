@@ -4,7 +4,7 @@ Aplicación web personal mobile-first para localizar fuentes públicas para bebe
 
 ## Requisitos y desarrollo
 
-- Node.js 20.9 o superior y npm.
+- Node.js 22 o superior y npm. El cliente oficial de Supabase utilizado para propuestas comunitarias requiere Node.js 22+.
 - Clona el repositorio existente y ejecuta:
 
 ```sh
@@ -42,6 +42,7 @@ La aplicación no necesita cuenta, base de datos ni clave para explorar los inve
 - Seguimiento continuo de ubicación al pulsar el botón, con opción para detenerlo. También se puede elegir origen tocando el mapa.
 - Filtros combinables de distancia, zonas verdes identificadas, estado y exclusión estacional cuando OSM aporta esa etiqueta. La ficha muestra accesibilidad solo cuando el dato existe.
 - Ficha con procedencia, estado disponible, favoritos locales, incidencias locales y enlaces a Google/Apple Maps.
+- Propuestas de fuentes con revisión manual y publicación comunitaria tras aprobación; requiere Supabase configurado.
 
 ## Datos, licencias y limitaciones
 
@@ -66,10 +67,10 @@ Las incidencias se validan y guardan en localStorage. No se envían al Ayuntamie
 ## Despliegue en Vercel
 
 1. Importa el repositorio existente en Vercel y deja Framework Preset en Next.js.
-2. Usa Node.js 20.x o superior; el comando de build es `npm run build`.
+2. Usa Node.js 22.x o superior; el comando de build es `npm run build`.
 3. Despliega. La geolocalización funcionará bajo HTTPS.
 
-No se necesita configurar almacenamiento remoto. El snapshot local se empaqueta con la app. Verifica que el proveedor cartográfico y sus licencias aceptan tu volumen previsto; OSM estándar es para uso moderado y sin SLA.
+Para habilitar propuestas, aplica la migración Supabase descrita en [Fuentes, licencias y límites](docs/FUENTES-DE-DATOS.md) y configura las variables de entorno de `.env.example` en Vercel. El snapshot municipal y OSM sigue empaquetado con la app. Verifica que el proveedor cartográfico y sus licencias aceptan tu volumen previsto; OSM estándar es para uso moderado y sin SLA.
 
 ## Arquitectura
 
