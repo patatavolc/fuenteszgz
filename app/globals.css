@@ -149,3 +149,140 @@ button,a,input,select,textarea{touch-action:manipulation}button:focus-visible,a:
 .proposal-dialog .community-source-module__form{padding-top:1rem}
 .map-control.active{background:#176b4a;color:white}
 @media(max-width:759px){.propose-source-button{top:auto;bottom:calc(51dvh + 10px);left:max(10px,env(safe-area-inset-left));right:auto}.map-region:has(.bottom-sheet.has-selection) .propose-source-button{bottom:calc(69dvh + 10px)}.map-region:has(.bottom-sheet.collapsed) .propose-source-button{bottom:116px}.proposal-dialog{padding:18px 14px}}
+
+/* Zaragoza map interface: quiet surfaces, a clear red action color, and one scale of radii. */
+:root{
+  --ink:#203238;
+  --muted:#66777b;
+  --teal:#c62828;
+  --teal-dark:#9f1d22;
+  --mint:#fff0ef;
+  --line:#dce3e3;
+  --paper:#ffffff;
+  --surface:#f5f7f7;
+  --page:#f3f5f5;
+  --shadow:0 14px 38px rgba(25,42,46,.18);
+  color:var(--ink);
+  background:var(--page);
+  color-scheme:light;
+}
+body{background:var(--page);color:var(--ink)}
+.map-region{background:var(--page)}
+.topbar{top:max(12px,env(safe-area-inset-top));left:18px;right:18px;justify-content:space-between;pointer-events:none}
+.topbar .brand{gap:10px;padding:7px 13px 7px 8px;border-color:var(--line);border-radius:14px;background:var(--paper);box-shadow:0 3px 14px rgba(29,48,52,.12)}
+.brand-icon{width:38px;height:38px;border-radius:11px}
+.brand strong{font-size:16px;letter-spacing:-.45px}
+.brand small{font-size:11px;color:var(--muted)}
+.topbar-actions{display:flex;gap:8px;pointer-events:auto}
+.topbar .icon-button{width:46px;height:46px;border-radius:13px;border-color:var(--line);background:var(--paper);box-shadow:0 3px 14px rgba(29,48,52,.12)}
+.search-box{top:76px;left:18px;right:18px;padding:9px 12px;border-color:var(--line);border-radius:16px;background:var(--paper);box-shadow:0 6px 22px rgba(29,48,52,.12)}
+.search-box input{font-size:15px}
+.search-box form>button{border-radius:10px}
+.search-subrow{margin-top:8px;padding-top:7px}
+.bottom-sheet{background:var(--paper);border:1px solid var(--line);border-bottom:0;border-radius:20px 20px 0 0;box-shadow:var(--shadow)}
+.sheet-header h1{font-size:22px;letter-spacing:-.55px}
+.eyebrow{font-size:10px;letter-spacing:.75px;color:var(--muted)}
+.result-row{background:transparent;border-color:var(--line);padding:11px 2px}
+.result-copy strong{font-size:13px}
+.result-copy small{font-size:11px}
+.status-mini{font-size:10px;line-height:1.35}
+.result-drop{border-radius:11px}
+.map-control,.legend-toggle{border-color:var(--line);border-radius:12px;background:var(--paper);color:var(--ink);box-shadow:0 3px 14px rgba(29,48,52,.12)}
+.map-control.active{background:var(--teal);color:white}
+.propose-source-button{background:var(--teal);color:#fff;box-shadow:0 4px 16px rgba(25,42,46,.25)}
+.map-legend{border-color:var(--line);border-radius:12px;background:var(--paper);color:var(--ink);box-shadow:0 3px 14px rgba(29,48,52,.12)}
+.site-footer{background:var(--paper);color:var(--muted);border-top:1px solid var(--line)}
+.site-footer a,.attribution-note a{color:var(--teal-dark)}
+.source-card{background:var(--surface);border-color:var(--line)}
+.incident-form{background:var(--surface);border-color:var(--line)}
+.filters-panel select,.incident-form select,.incident-form textarea{background:var(--paper);color:var(--ink);border-color:var(--line)}
+.result-row:hover{background:var(--surface)}
+.settings-dialog{width:min(420px,calc(100vw - 32px));max-width:none;margin:auto;padding:22px;border:1px solid var(--line);border-radius:18px;background:var(--paper);color:var(--ink);box-shadow:var(--shadow)}
+.settings-dialog::backdrop{background:rgba(20,31,34,.42);backdrop-filter:blur(2px)}
+.settings-dialog-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}
+.settings-dialog h2{margin:0;font-size:21px;letter-spacing:-.45px}
+.settings-dialog-header p,.settings-note{margin:4px 0 0;color:var(--muted);font-size:13px;line-height:1.45}
+.settings-close{width:40px;height:40px;flex:none;display:grid;place-items:center;border:1px solid var(--line);border-radius:11px;background:var(--paper);color:var(--muted)}
+.appearance-setting{display:grid;gap:8px;font-size:13px;font-weight:700}
+.appearance-setting select{width:100%;min-height:46px;padding:8px 11px;border:1px solid var(--line);border-radius:11px;background:var(--paper);color:var(--ink)}
+.settings-note{margin-top:12px;font-size:12px}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline-color:var(--teal);outline-offset:3px}
+
+html[data-theme="dark"]{
+  --ink:#edf2f2;
+  --muted:#b0bec0;
+  --teal:#ed5a58;
+  --teal-dark:#ff8580;
+  --mint:#482b2d;
+  --line:#3b484b;
+  --paper:#202628;
+  --surface:#293235;
+  --page:#171d1f;
+  --shadow:0 16px 42px rgba(0,0,0,.38);
+  color-scheme:dark;
+}
+html[data-theme="dark"] body,
+html[data-theme="dark"] .map-region{background:var(--page);color:var(--ink)}
+html[data-theme="dark"] .topbar .brand,
+html[data-theme="dark"] .topbar .icon-button,
+html[data-theme="dark"] .search-box,
+html[data-theme="dark"] .bottom-sheet,
+html[data-theme="dark"] .map-control,
+html[data-theme="dark"] .legend-toggle,
+html[data-theme="dark"] .map-legend,
+html[data-theme="dark"] .site-footer,
+html[data-theme="dark"] .collapse-button,
+html[data-theme="dark"] .result-row,
+html[data-theme="dark"] .settings-dialog,
+html[data-theme="dark"] .settings-close,
+html[data-theme="dark"] .appearance-setting select,
+html[data-theme="dark"] .filters-panel select,
+html[data-theme="dark"] .incident-form select,
+html[data-theme="dark"] .incident-form textarea,
+html[data-theme="dark"] .proposal-dialog,
+html[data-theme="dark"] .proposal-close,
+html[data-theme="dark"] .leaflet-control-zoom a{background:var(--paper);color:var(--ink);border-color:var(--line)}
+html[data-theme="dark"] .map-control.active,
+html[data-theme="dark"] .primary-action,
+html[data-theme="dark"] .search-box form>button{background:var(--teal);color:#fff}
+html[data-theme="dark"] .secondary-action,
+html[data-theme="dark"] .empty-state button,
+html[data-theme="dark"] .result-drop{background:var(--mint);color:var(--teal-dark)}
+html[data-theme="dark"] .source-card,
+html[data-theme="dark"] .incident-form{background:var(--surface);border-color:var(--line)}
+html[data-theme="dark"] .map-control:hover,
+html[data-theme="dark"] .icon-button:hover,
+html[data-theme="dark"] .collapse-button:hover{box-shadow:0 5px 18px rgba(0,0,0,.42)}
+html[data-theme="dark"] .result-row:hover{background:var(--surface)}
+html[data-theme="dark"] .status-pill.muted{background:#303a3d;color:#c1cdcf}
+html[data-theme="dark"] .status-pill.good{background:#233d35;color:#a3d7c2}
+html[data-theme="dark"] .status-pill.bad{background:#472b2c;color:#ffaaa4}
+html[data-theme="dark"] .community-pill{background:#352b40;color:#d8c1f3}
+html[data-theme="dark"] .tabs{border-color:var(--line)}
+html[data-theme="dark"] .tabs button{color:var(--muted)}
+html[data-theme="dark"] .tabs button.selected{color:var(--teal-dark)}
+html[data-theme="dark"] .leaflet-control-zoom{box-shadow:0 3px 12px rgba(0,0,0,.4)!important}
+html[data-theme="dark"] .leaflet-control-zoom a{color:var(--teal-dark)!important}
+html[data-theme="dark"] .leaflet-control-attribution{background:rgba(32,38,40,.88)!important;color:#e2e8e8!important}
+html[data-theme="dark"] .leaflet-control-attribution a{color:#ffaaa4!important}
+html[data-theme="dark"] .attribution-note{background:rgba(32,38,40,.9);color:var(--muted)}
+html[data-theme="dark"] .toast{background:#293235;color:var(--ink);border:1px solid var(--line)}
+html[data-theme="dark"] .toast button{color:var(--ink)}
+html[data-theme="dark"] .map-loading{color:var(--muted)}
+html[data-theme="dark"] .privacy-page{color:var(--ink)}
+html[data-theme="dark"] .privacy-page p{color:var(--muted)}
+
+@media(min-width:760px){
+  .topbar{top:18px;left:22px;right:22px}
+  .search-box{top:84px;left:22px;right:auto;width:390px}
+  .bottom-sheet{left:20px;bottom:16px;width:410px}
+}
+@media(max-width:380px){
+  .topbar{left:10px;right:10px}
+  .topbar .brand{padding-right:8px}
+  .brand-copy{display:none}
+  .topbar-actions{gap:6px}
+  .topbar .icon-button{width:44px;height:44px}
+  .search-box{top:68px;left:10px;right:10px;padding-left:9px;padding-right:9px}
+}
+@media(prefers-reduced-motion:reduce){.settings-dialog::backdrop{backdrop-filter:none}}
