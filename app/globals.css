@@ -8,7 +8,7 @@
 
 
 button,a,input,select,textarea{touch-action:manipulation}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #D92A22;outline-offset:2px}
-.map-pin.pin-community{background:#7b58a8}.legend-dot.community{background:#7b58a8}.result-drop.community{color:#704f9a;background:#f0ebf7}.community-pill{background:#f0ebf7;color:#65448f}.detail-extra{margin:3px 0 8px;color:#667a7c;font-size:10px;line-height:1.4}
+.map-pin.pin-community{background:#7b58a8}.map-pin.pin-proposal{background:#267b63}.legend-dot.community{background:#7b58a8}.legend-dot.proposal{background:#267b63}.result-drop.community{color:#704f9a;background:#f0ebf7}.community-pill{background:#f0ebf7;color:#65448f}.detail-extra{margin:3px 0 8px;color:#667a7c;font-size:10px;line-height:1.4}
 .tabs button,.subtle-button,.filter-trigger,.list-meta button,.collapse-button,.back-link,.report-link{min-height:40px}.search-box form>button{width:42px;height:42px}.leaflet-control-zoom a{width:44px!important;height:44px!important;line-height:44px!important}
 @media(max-width:759px){.map-region:not(:has(.bottom-sheet.has-selection)) .leaflet-bottom{bottom:calc(51dvh + 100px)!important}.map-region:has(.bottom-sheet.has-selection) .leaflet-bottom{bottom:calc(69dvh + 100px)!important}}
 

@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { formatSnapshotValidationReport, validateSnapshot } from "../lib/snapshot-validation";
-import { writeValidatedSnapshotAtomically } from "./write-snapshot";
+import { compareSnapshotFileIds, writeValidatedSnapshotAtomically } from "./write-snapshot";
 
 const output = resolve("data/osm-candidates.geojson");
 const query = `[out:json][timeout:25];(node["amenity"="drinking_water"](41.56,-1.05,41.76,-0.70);way["amenity"="drinking_water"](41.56,-1.05,41.76,-0.70);relation["amenity"="drinking_water"](41.56,-1.05,41.76,-0.70);node["amenity"="fountain"]["fountain"="drinking"](41.56,-1.05,41.76,-0.70);way["amenity"="fountain"]["fountain"="drinking"](41.56,-1.05,41.76,-0.70);node["amenity"="fountain"]["drinking_water"="yes"](41.56,-1.05,41.76,-0.70);way["amenity"="fountain"]["drinking_water"="yes"](41.56,-1.05,41.76,-0.70););out center;`;
@@ -18,11 +18,14 @@ async function main() {
     const tags = element.tags ?? {};
     return { type: "Feature", id: `${element.type}/${element.id}`, geometry: { type: "Point", coordinates: point ? [point.lon, point.lat] : [] }, properties: { tags } };
   });
-  const snapshot = { type: "FeatureCollection", name: "Candidatos comunitarios de agua para beber — OpenStreetMap", license: "ODbL", timestamp: data.osm3s?.timestamp_osm_base ?? new Date().toISOString(), queryBounds: "41.56,-1.05,41.76,-0.70", features };
+  const sourceTimestamp = data.osm3s?.timestamp_osm_base;
+  const snapshot = { type: "FeatureCollection", name: "Candidatos comunitarios de agua para beber — OpenStreetMap", license: "ODbL", ...(sourceTimestamp ? { sourceTimestamp } : {}), generatedAt: new Date().toISOString(), queryBounds: "41.56,-1.05,41.76,-0.70", features };
   const validation = validateSnapshot(snapshot, "osm");
   console.info(formatSnapshotValidationReport(validation.report));
+  const changes = await compareSnapshotFileIds(output, snapshot, "osm");
+  console.info(`Cambios frente al snapshot anterior: +${changes.added.length} [${changes.added.join(", ")}]; -${changes.removed.length} [${changes.removed.join(", ")}]`);
   await writeValidatedSnapshotAtomically(output, snapshot, validation);
-  console.info(`Candidatos OSM guardados: ${validation.report.accepted}; base ${snapshot.timestamp}`);
+  console.info(`Candidatos OSM guardados: ${validation.report.accepted}; base ${sourceTimestamp ?? "fecha no informada por Overpass"}; generado ${snapshot.generatedAt}`);
 }
 
 main().catch((error: unknown) => { console.error(error instanceof Error ? error.message : "Error al actualizar OSM"); process.exitCode = 1; });

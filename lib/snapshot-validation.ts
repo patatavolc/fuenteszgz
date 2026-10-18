@@ -7,6 +7,7 @@ export type SnapshotDiscardReason =
   | "invalid-geometry"
   | "invalid-coordinate"
   | "missing-id"
+  | "duplicate-id"
   | "invalid-tags"
   | "restricted-access"
   | "non-potable"
@@ -27,9 +28,35 @@ export type SnapshotValidationReport = {
   discarded: number;
   discardedByReason: Partial<Record<SnapshotDiscardReason, number>>;
   discardDetails: Array<{ index: number; id?: string | number; reason: SnapshotDiscardReason }>;
+  warnings: Array<{ index: number; id?: string | number; reason: "outside-query-bounds" }>;
 };
 
 export type SnapshotValidationResult = { features: SnapshotFeature[]; report: SnapshotValidationReport };
+
+export function compareSnapshotIds(previous: unknown, next: unknown, source: SnapshotSource): { added: string[]; removed: string[] } {
+  const ids = (input: unknown, label: string, missingAllowed = false): Set<string> => {
+    if (input === undefined && missingAllowed) return new Set();
+    const validation = validateSnapshot(input, source);
+    if (!validation.features.length || validation.report.discarded > 0) {
+      throw new Error(`${label} inválido: ${formatSnapshotValidationReport(validation.report)}`);
+    }
+    return new Set(validation.features.flatMap((feature) => {
+      if (!isRecord(feature)) return [];
+      if (source === "municipal") {
+        if (!isRecord(feature.properties)) return [];
+        const value = feature.properties.codigo ?? feature.id;
+        return typeof value === "string" || (typeof value === "number" && Number.isFinite(value)) ? [String(value).trim()] : [];
+      }
+      return typeof feature.id === "string" ? [normalizeOsmId(feature.id)] : [];
+    }).filter(Boolean));
+  };
+  const previousIds = ids(previous, "Snapshot anterior", true);
+  const nextIds = ids(next, "Snapshot nuevo");
+  return {
+    added: [...nextIds].filter((id) => !previousIds.has(id)).sort(),
+    removed: [...previousIds].filter((id) => !nextIds.has(id)).sort(),
+  };
+}
 
 const municipalTextFields = ["ubicacion", "vial", "distrito", "barrio", "color", "superficie"] as const;
 
@@ -41,8 +68,14 @@ function printableId(value: unknown): string | number | undefined {
   return typeof value === "string" || (typeof value === "number" && Number.isFinite(value)) ? value : undefined;
 }
 
+function normalizeOsmId(value: string): string {
+  const id = value.trim();
+  return id.startsWith("osm:") ? id.slice(4) : id;
+}
+
 export function validateSnapshot(input: unknown, source: SnapshotSource): SnapshotValidationResult {
   const discardDetails: SnapshotValidationReport["discardDetails"] = [];
+  const warnings: SnapshotValidationReport["warnings"] = [];
   const discardedByReason: SnapshotValidationReport["discardedByReason"] = {};
   const discard = (index: number, id: string | number | undefined, reason: SnapshotDiscardReason) => {
     discardedByReason[reason] = (discardedByReason[reason] ?? 0) + 1;
@@ -53,17 +86,23 @@ export function validateSnapshot(input: unknown, source: SnapshotSource): Snapsh
     discard(-1, undefined, "invalid-collection");
     return {
       features: [],
-      report: { source, total: 0, accepted: 0, normalized: 0, discarded: 1, discardedByReason, discardDetails },
+      report: { source, total: 0, accepted: 0, normalized: 0, discarded: 1, discardedByReason, discardDetails, warnings },
     };
   }
 
   const valid: SnapshotFeature[] = [];
+  const seenIds = new Set<string>();
+  const bounds = source === "osm" && typeof input.queryBounds === "string"
+    ? input.queryBounds.split(",").map(Number) : [];
+  const queryBounds = bounds.length === 4 && bounds.every(Number.isFinite)
+    ? { south: bounds[0], west: bounds[1], north: bounds[2], east: bounds[3] } : undefined;
   input.features.forEach((item: unknown, index: number) => {
     if (!isRecord(item)) { discard(index, undefined, "invalid-feature"); return; }
     const id = printableId(item.id);
     if (item.type !== "Feature") { discard(index, id, "invalid-feature"); return; }
     if (!isRecord(item.properties)) { discard(index, id, "invalid-properties"); return; }
     const properties = item.properties;
+    let logicalId: string;
 
     if (source === "municipal") {
       const code = properties.codigo;
@@ -78,8 +117,11 @@ export function validateSnapshot(input: unknown, source: SnapshotSource): Snapsh
       }
       const codeText = String(code ?? id ?? "").trim();
       if (!codeText) { discard(index, id, "missing-id"); return; }
+      logicalId = codeText;
     } else {
       if (typeof item.id !== "string" || !item.id.trim()) { discard(index, id, "missing-id"); return; }
+      logicalId = normalizeOsmId(item.id);
+      if (!logicalId) { discard(index, id, "missing-id"); return; }
       if (!isRecord(properties.tags) || Object.values(properties.tags).some((tag) => typeof tag !== "string")) {
         discard(index, id, "invalid-tags"); return;
       }
@@ -99,6 +141,11 @@ export function validateSnapshot(input: unknown, source: SnapshotSource): Snapsh
     }
     const [lon, lat] = coordinates;
     if (Math.abs(lon) > 180 || Math.abs(lat) > 90) { discard(index, id, "invalid-coordinate"); return; }
+    if (seenIds.has(logicalId)) { discard(index, id, "duplicate-id"); return; }
+    seenIds.add(logicalId);
+    if (queryBounds && (lat < queryBounds.south || lat > queryBounds.north || lon < queryBounds.west || lon > queryBounds.east)) {
+      warnings.push({ index, ...(id !== undefined ? { id } : {}), reason: "outside-query-bounds" });
+    }
 
     valid.push(item as unknown as SnapshotFeature);
   });
@@ -106,7 +153,7 @@ export function validateSnapshot(input: unknown, source: SnapshotSource): Snapsh
   const total = input.features.length;
   return {
     features: valid,
-    report: { source, total, accepted: valid.length, normalized: valid.length, discarded: discardDetails.length, discardedByReason, discardDetails },
+    report: { source, total, accepted: valid.length, normalized: valid.length, discarded: discardDetails.length, discardedByReason, discardDetails, warnings },
   };
 }
 
@@ -117,8 +164,10 @@ export function meetsSnapshotCoverage(accepted: number, expected: number, minimu
 export function formatSnapshotValidationReport(report: SnapshotValidationReport): string {
   const sourceName = report.source === "municipal" ? "Municipal" : "OSM";
   const summary = `${sourceName}: ${report.accepted}/${report.total} registros válidos; ${report.discarded} descartados; ${report.normalized} normalizados`;
-  if (!report.discarded) return summary;
+  if (!report.discarded && !report.warnings.length) return summary;
   const reasons = Object.entries(report.discardedByReason).map(([reason, count]) => `${reason}=${count}`).join(", ");
   const details = report.discardDetails.map(({ index, id, reason }) => `índice ${index}${id !== undefined ? ` (${id})` : ""}: ${reason}`).join("; ");
-  return `${summary} (${reasons}). Detalle: ${details}`;
+  const discardedSummary = report.discarded ? ` (${reasons}). Detalle: ${details}` : "";
+  const warnings = report.warnings.length ? ` Advertencias: ${report.warnings.map(({ index, id, reason }) => `índice ${index}${id !== undefined ? ` (${id})` : ""}: ${reason}`).join("; ")}` : "";
+  return `${summary}${discardedSummary}${warnings}`;
 }

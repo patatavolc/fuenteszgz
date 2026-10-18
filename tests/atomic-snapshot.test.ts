@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { writeValidatedSnapshotAtomically } from "@/scripts/write-snapshot";
+import { compareSnapshotFileIds, writeValidatedSnapshotAtomically } from "@/scripts/write-snapshot";
 import { validateSnapshot } from "@/lib/snapshot-validation";
 
 const temporaryDirectories: string[] = [];
@@ -18,6 +18,79 @@ afterEach(async () => {
 });
 
 describe("escritura atómica de snapshots validados", () => {
+  it("permite comparar y crear el primer snapshot cuando el destino no existe", async () => {
+    const directory = await createDirectory();
+    const destination = join(directory, "snapshot.geojson");
+    const next = { type: "FeatureCollection", features: [
+      { type: "Feature", id: "F1", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { codigo: "F1" } },
+    ] };
+
+    await expect(compareSnapshotFileIds(destination, next, "municipal")).resolves.toEqual({ added: ["F1"], removed: [] });
+    await writeValidatedSnapshotAtomically(destination, next, validateSnapshot(next, "municipal"));
+    expect(JSON.parse(await readFile(destination, "utf8")).features).toHaveLength(1);
+  });
+
+  it("rechaza un snapshot OSM previo inválido sin modificarlo", async () => {
+    const directory = await createDirectory();
+    const destination = join(directory, "osm.geojson");
+    const content = '{"type":"FeatureCollection","features":[{}]}';
+    const next = { type: "FeatureCollection", features: [
+      { type: "Feature", id: "node/1", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { tags: { amenity: "drinking_water" } } },
+    ] };
+    await writeFile(destination, content, "utf8");
+
+    await expect(compareSnapshotFileIds(destination, next, "osm")).rejects.toThrow(`${destination} no cumple el esquema`);
+    expect(await readFile(destination, "utf8")).toBe(content);
+  });
+
+  it("aborta y conserva el snapshot OSM previo cuando su ID queda vacío al normalizar", async () => {
+    const directory = await createDirectory();
+    const destination = join(directory, "osm.geojson");
+    const previous = { type: "FeatureCollection", features: [
+      { type: "Feature", id: "osm:", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { tags: { amenity: "drinking_water" } } },
+    ] };
+    const content = `${JSON.stringify(previous)}\n`;
+    const next = { type: "FeatureCollection", features: [
+      { type: "Feature", id: "node/2", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { tags: { amenity: "drinking_water" } } },
+    ] };
+    await writeFile(destination, content, "utf8");
+
+    await expect(compareSnapshotFileIds(destination, next, "osm"))
+      .rejects.toThrow(/snapshot anterior.*índice 0 \(osm:\): missing-id/i);
+    expect(await readFile(destination, "utf8")).toBe(content);
+    expect(await readdir(directory)).toEqual(["osm.geojson"]);
+  });
+
+  it("informa errores de lectura del snapshot existente con su ruta", async () => {
+    const directory = await createDirectory();
+    const destination = join(directory, "snapshot.geojson");
+    await mkdir(destination);
+    const next = { type: "FeatureCollection", features: [
+      { type: "Feature", id: "F1", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { codigo: "F1" } },
+    ] };
+
+    await expect(compareSnapshotFileIds(destination, next, "municipal")).rejects.toThrow(destination);
+    expect(await readdir(directory)).toEqual(["snapshot.geojson"]);
+  });
+
+  it.each([
+    ["JSON válido sin features", '{"type":"FeatureCollection"}'],
+    ["features con tipo incorrecto", '{"type":"FeatureCollection","features":{}}'],
+    ["features con una entidad inválida", '{"type":"FeatureCollection","features":[{}]}'],
+    ["JSON sintácticamente inválido", '{"type":"FeatureCollection","features":'],
+  ])("rechaza %s y conserva exactamente el archivo anterior", async (_description, content) => {
+    const directory = await createDirectory();
+    const destination = join(directory, "snapshot.geojson");
+    await writeFile(destination, content, "utf8");
+    const next = { type: "FeatureCollection", features: [
+      { type: "Feature", id: "F1", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { codigo: "F1" } },
+    ] };
+
+    await expect(compareSnapshotFileIds(destination, next, "municipal")).rejects.toThrow(destination);
+    expect(await readFile(destination, "utf8")).toBe(content);
+    expect(await readdir(directory)).toEqual(["snapshot.geojson"]);
+  });
+
   it("reemplaza el snapshot tras validar y no deja archivos temporales", async () => {
     const directory = await createDirectory();
     const destination = join(directory, "snapshot.geojson");
@@ -46,6 +119,21 @@ describe("escritura atómica de snapshots validados", () => {
     await expect(writeValidatedSnapshotAtomically(destination, snapshot, validation, { expected: 100 }))
       .rejects.toThrow("95 %");
 
+    expect(await readFile(destination, "utf8")).toBe("snapshot anterior");
+    expect(await readdir(directory)).toEqual(["snapshot.geojson"]);
+  });
+
+  it("bloquea snapshots con identificadores municipales repetidos e informa del registro", async () => {
+    const directory = await createDirectory();
+    const destination = join(directory, "snapshot.geojson");
+    await writeFile(destination, "snapshot anterior", "utf8");
+    const snapshot = { type: "FeatureCollection", features: [
+      { type: "Feature", id: "source.1", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { codigo: "F1" } },
+      { type: "Feature", id: "source.2", geometry: { type: "Point", coordinates: [-.89, 41.65] }, properties: { codigo: "F1" } },
+    ] };
+    const validation = validateSnapshot(snapshot, "municipal");
+
+    await expect(writeValidatedSnapshotAtomically(destination, snapshot, validation)).rejects.toThrow("índice 1 (source.2)");
     expect(await readFile(destination, "utf8")).toBe("snapshot anterior");
     expect(await readdir(directory)).toEqual(["snapshot.geojson"]);
   });
