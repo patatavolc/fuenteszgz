@@ -19,8 +19,9 @@ export function normalizeMunicipalDataWithReport(input: unknown): { fountains: F
     const address = clean(properties.vial);
     const service = properties.en_servicio;
     const status: OperatingStatus = service === true ? "operativa" : service === false ? "fuera-de-servicio" : "desconocida";
+    const displayName = [location, address].filter(Boolean).join(" · ") || "Fuente municipal";
     output.push({
-      id: `municipal:${code}`, name: `Fuente ${code}`, ...(address ? { address } : {}), ...(location ? { location } : {}),
+      id: `municipal:${code}`, name: displayName, officialCode: code, ...(address ? { address } : {}), ...(location ? { location } : {}),
       ...(typeof properties.distrito === "string" ? { district: clean(properties.distrito) } : {}),
       ...(typeof properties.barrio === "string" ? { neighborhood: clean(properties.barrio) } : {}),
       lat, lon, status, ...(service === true || service === false ? { statusSource: "Ayuntamiento de Zaragoza · campo en_servicio" } : {}),
@@ -94,8 +95,99 @@ export function distanceMeters(a: Point, b: Point): number {
   return 6371000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
+/** Normalize only records returned by the approved community-source API. */
+export function normalizeCommunitySources(input: unknown): Fountain[] {
+  if (!Array.isArray(input)) return [];
+  return input.flatMap((row): Fountain[] => {
+    if (!row || typeof row !== "object") return [];
+    const source = row as Partial<CommunitySource>;
+    if (source.status !== "approved" || typeof source.id !== "string"
+      || typeof source.lat !== "number" || typeof source.lon !== "number"
+      || !Number.isFinite(source.lat) || !Number.isFinite(source.lon)
+      || Math.abs(source.lat) > 90 || Math.abs(source.lon) > 180) return [];
+    const name = clean(source.name) ?? clean(source.location) ?? "Fuente comunitaria";
+    const location = clean(source.location);
+    const description = clean(source.description);
+    return [{
+      id: `community:${source.id}`, name, lat: source.lat, lon: source.lon,
+      ...(location ? { location } : {}), ...(description ? { description } : {}),
+      status: "desconocida", source: "Fuente propuesta (comunidad)",
+      sourceUrl: `/proponer#${encodeURIComponent(source.id)}`, confidence: "media", communityStatus: "approved",
+    }];
+  });
+}
+
+function normalizeEvidence(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const normalized = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/\b(calle|c\.?|avenida|av\.?|paseo|pso\.?|plaza|pza\.?|parque)\b/g, " ")
+    .replace(/\([^)]*\)|\b\d+[a-z]?\b/g, " ")
+    .replace(/[^a-z]+/g, " ").trim().replace(/\s+/g, " ");
+  return normalized || undefined;
+}
+
+function streetEvidence(fountain: Fountain): string | undefined {
+  const address = normalizeEvidence(fountain.address);
+  if (address) return address;
+  const tags = fountain.osmTags;
+  return normalizeEvidence(tags?.["addr:street"]);
+}
+
+function parkEvidence(fountain: Fountain): string | undefined {
+  return normalizeEvidence(fountain.location);
+}
+
+function hasMatchingEvidence(municipal: Fountain, osm: Fountain): boolean {
+  const municipalStreet = streetEvidence(municipal);
+  const osmStreet = streetEvidence(osm);
+  if (municipalStreet && osmStreet) return municipalStreet === osmStreet;
+  const municipalPark = parkEvidence(municipal);
+  const osmPark = parkEvidence(osm);
+  return Boolean(municipalPark && osmPark && municipalPark === osmPark);
+}
+
+/**
+ * Returns a display set led by municipal records. OSM is attached only when
+ * the pair is close, has corroborating address/location evidence, and is the
+ * unique closest candidate in both directions. Ambiguous records stay separate.
+ */
+export function buildPrioritizedDisplaySet(municipal: Fountain[], osm: Fountain[], toleranceMeters = 15): Fountain[] {
+  const candidates = new Map<string, Array<{ osm: Fountain; distance: number }>>();
+  for (const city of municipal) {
+    const nearby = osm.map((community) => ({ osm: community, distance: distanceMeters(city, community) }))
+      .filter(({ osm: community, distance }) => distance <= toleranceMeters && hasMatchingEvidence(city, community))
+      .sort((a, b) => a.distance - b.distance);
+    candidates.set(city.id, nearby);
+  }
+
+  const reverse = new Map<string, Array<{ municipal: Fountain; distance: number }>>();
+  for (const city of municipal) for (const candidate of candidates.get(city.id) ?? []) {
+    const rows = reverse.get(candidate.osm.id) ?? [];
+    rows.push({ municipal: city, distance: candidate.distance });
+    reverse.set(candidate.osm.id, rows);
+  }
+
+  const matchedOsmIds = new Set<string>();
+  const displayedMunicipal = municipal.map((city) => {
+    const nearby = candidates.get(city.id) ?? [];
+    if (!nearby.length) return city;
+    const nearest = nearby[0];
+    const equallyClose = nearby.filter((candidate) => Math.abs(candidate.distance - nearest.distance) < 0.5);
+    const reverseNearby = reverse.get(nearest.osm.id) ?? [];
+    const reverseNearest = [...reverseNearby].sort((a, b) => a.distance - b.distance);
+    const reverseTied = reverseNearest.filter((candidate) => Math.abs(candidate.distance - reverseNearest[0].distance) < 0.5);
+    if (equallyClose.length !== 1 || reverseTied.length !== 1 || reverseTied[0].municipal.id !== city.id) return city;
+    matchedOsmIds.add(nearest.osm.id);
+    return { ...city, matchedOsm: [nearest.osm] };
+  });
+  return [...displayedMunicipal, ...osm.filter((community) => !matchedOsmIds.has(community.id))];
+}
+
 export type Filters = { maxDistanceKm: number; greenOnly: boolean; status: OperatingStatus | "todas"; excludeSeasonal?: boolean };
-export function hasSeasonalEvidence(fountain: Fountain) { return Boolean(fountain.seasonal && fountain.seasonal !== "no"); }
+export function hasSeasonalEvidence(fountain: Fountain) {
+  return Boolean(fountain.seasonal && fountain.seasonal !== "no")
+    || Boolean(fountain.matchedOsm?.some((match) => match.seasonal && match.seasonal !== "no"));
+}
 export function findNearby(fountains: Fountain[], origin: Point, filters: Filters, limit = 2500) {
   return fountains.map((fountain) => ({ fountain, distance: distanceMeters(origin, fountain) }))
     .filter(({ fountain, distance }) => distance <= filters.maxDistanceKm * 1000
@@ -107,4 +199,4 @@ export function findNearby(fountains: Fountain[], origin: Point, filters: Filter
 
 export const municipalFountains = normalizeMunicipalData(collection);
 export const osmFountains = normalizeOsmData(osmCollection);
-export const fountains = [...municipalFountains, ...osmFountains];
+export const fountains = buildPrioritizedDisplaySet(municipalFountains, osmFountains);

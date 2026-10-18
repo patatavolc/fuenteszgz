@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("mobile layout fits the viewport and requests geolocation on entry", async ({ page }) => {
+test("mobile layout keeps geolocation opt-in and controls accessible", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   let requests = 0;
   await page.addInitScript(() => {
@@ -15,13 +15,27 @@ test("mobile layout fits the viewport and requests geolocation on entry", async 
   await page.route("https://tile.openstreetmap.org/**", (route) => route.abort());
   await page.goto("/");
   await expect(page.locator(".leaflet-container")).toBeVisible();
-  await expect(page.locator(".location-status")).toContainText("Ubicación denegada");
   requests = await page.evaluate(() => (window as Window & { __geoRequests?: number }).__geoRequests ?? 0);
-  expect(requests).toBe(1);
+  expect(requests).toBe(0);
   await page.getByRole("button", { name: "Localizarme" }).first().click();
   await expect(page.locator(".location-status")).toContainText("Ubicación denegada");
   requests = await page.evaluate(() => (window as Window & { __geoRequests?: number }).__geoRequests ?? 0);
-  expect(requests).toBe(2);
+  expect(requests).toBe(1);
+  const list = page.getByRole("list");
+  await expect(list.getByRole("listitem").first().getByRole("button")).toBeVisible();
+  const collapse = page.getByRole("button", { name: "Ocultar resultados" });
+  await collapse.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("button", { name: "Mostrar resultados" })).toHaveAttribute("aria-expanded", "false");
+  await page.keyboard.press("Space");
+  await expect(page.getByRole("button", { name: "Ocultar resultados" })).toHaveAttribute("aria-expanded", "true");
+  const collapseBox = await collapse.boundingBox();
+  if (!collapseBox) throw new Error("Collapse control is not visible");
+  await page.mouse.move(collapseBox.x + collapseBox.width / 2, collapseBox.y + collapseBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(collapseBox.x + collapseBox.width / 2, collapseBox.y + collapseBox.height / 2 + 60);
+  await page.mouse.up();
+  await expect(page.getByRole("button", { name: "Mostrar resultados" })).toHaveAttribute("aria-expanded", "false");
   const dimensions = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width);
   await expect(page.getByRole("textbox", { name: "Buscar dirección, parque o fuente" })).toBeVisible();
@@ -44,4 +58,87 @@ test("desktop layout remains within the viewport and keeps map controls accessib
   await expect(page.getByRole("button", { name: "Localizarme" }).first()).toBeVisible();
   await expect(page.locator(".leaflet-control-zoom")).toBeVisible();
   expect(pageErrors).toEqual([]);
+});
+
+test("location and search share a row and the map legend opens on demand", async ({ page }) => {
+  await page.route("https://tile.openstreetmap.org/**", (route) => route.abort());
+  await page.goto("/");
+  const location = page.getByRole("button", { name: "Localizarme" });
+  const search = page.getByRole("textbox", { name: "Buscar dirección, parque o fuente" });
+  const legendToggle = page.getByRole("button", { name: "Colores del mapa" });
+  await expect(legendToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("#map-legend-panel")).toBeHidden();
+
+  for (const viewport of [{ width: 320, height: 720 }, { width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    await page.setViewportSize(viewport);
+    const [locationBox, searchBox] = await Promise.all([location.boundingBox(), search.boundingBox()]);
+    expect(locationBox, `location button at ${viewport.width}px`).not.toBeNull();
+    expect(searchBox, `search input at ${viewport.width}px`).not.toBeNull();
+    expect(locationBox!.width).toBeGreaterThanOrEqual(44);
+    expect(locationBox!.height).toBeGreaterThanOrEqual(44);
+    expect(Math.abs((locationBox!.y + locationBox!.height / 2) - (searchBox!.y + searchBox!.height / 2)), `vertical alignment at ${viewport.width}px`).toBeLessThan(12);
+    expect(locationBox!.x + locationBox!.width).toBeLessThan(searchBox!.x + 2);
+    const dimensions = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
+    expect(dimensions.scrollWidth, `horizontal overflow at ${viewport.width}px`).toBeLessThanOrEqual(dimensions.width);
+  }
+
+  await page.getByRole("button", { name: "Colores del mapa" }).click();
+  const legend = page.getByRole("region", { name: "Significado de los colores del mapa" });
+  await expect(legend).toBeVisible();
+  await expect(legend.locator(".legend-dot")).toHaveCount(3);
+  await expect(page.getByRole("button", { name: "Ocultar leyenda" })).toHaveAttribute("aria-expanded", "true");
+  await page.getByRole("button", { name: "Ocultar leyenda" }).click();
+  await expect(legend).toBeHidden();
+});
+
+test("search, filters, fountain details and favorites work on mobile and desktop", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "geolocation", { configurable: true, value: {
+      getCurrentPosition: (_success: PositionCallback, error: PositionErrorCallback) => error({ code: 1, message: "denied", PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 }),
+      watchPosition: (_success: PositionCallback, error: PositionErrorCallback) => { error({ code: 1, message: "denied", PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 }); return 1; },
+      clearWatch: () => undefined,
+    } });
+  });
+  await page.route("https://tile.openstreetmap.org/**", (route) => route.abort());
+  await page.goto("/");
+  const search = page.getByRole("textbox", { name: "Buscar dirección, parque o fuente" });
+  await expect(search).toBeVisible();
+  const rows = page.locator(".result-row");
+  await expect(rows.first()).toBeVisible();
+  const initialCount = await rows.count();
+
+  const filters = page.getByRole("button", { name: /Filtros/ });
+  await expect(filters).toHaveAttribute("aria-expanded", "false");
+  await filters.click();
+  await expect(filters).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("slider", { name: /Distancia máxima/ })).toBeVisible();
+  const status = page.getByLabel("Estado disponible");
+  await expect(status).toBeVisible();
+  await status.selectOption("operativa");
+  await status.selectOption("todas");
+  await filters.click();
+
+  const firstName = (await rows.first().locator("strong").innerText()).trim();
+  await search.fill(firstName);
+  await expect(rows.first().locator("strong")).toHaveText(firstName);
+  expect(await rows.count()).toBeLessThanOrEqual(initialCount);
+  await rows.first().click();
+  await expect(page.locator(".detail-content")).toBeVisible();
+  await expect(page.getByRole("heading", { name: firstName })).toBeVisible();
+  await page.getByRole("button", { name: "Guardar" }).click();
+  await expect(page.getByRole("button", { name: "Guardado" })).toBeVisible();
+  await page.getByRole("button", { name: "Volver a resultados" }).click();
+  await page.getByRole("button", { name: /Favoritos/ }).click();
+  await expect(page.locator(".result-row strong", { hasText: firstName })).toBeVisible();
+
+  for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    await page.setViewportSize(viewport);
+    const dimensions = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
+    expect(dimensions.scrollWidth, `horizontal overflow at ${viewport.width}px`).toBeLessThanOrEqual(dimensions.width);
+    await expect(page.getByRole("button", { name: "Localizarme" }).first()).toBeVisible();
+    await expect(page.locator(".leaflet-control-zoom")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Cercanas/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Favoritos/ })).toBeVisible();
+  }
 });

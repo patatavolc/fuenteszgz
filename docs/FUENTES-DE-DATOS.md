@@ -1,5 +1,9 @@
 # Fuentes, licencias y límites del inventario
 
+## Propuestas comunitarias
+
+El formulario de propuesta requiere configuración opcional de Supabase. Sin ella no se guardan propuestas y la interfaz lo indica claramente. La migración `supabase/migrations/20261018000000_fountain_proposals.sql` crea una tabla con inserción anónima restringida a estado `pending`, sin lectura, edición ni borrado públicos. La revisión se realiza manualmente desde Supabase. Las propuestas, incluso las aprobadas, no se incorporan automáticamente al inventario ni al mapa; deben verificarse y añadirse explícitamente al snapshot mantenido en el repositorio.
+
 Consulta realizada el **16 de octubre de 2026**.
 
 ## Ayuntamiento de Zaragoza (fuente principal)
@@ -15,11 +19,11 @@ Consulta realizada el **16 de octubre de 2026**.
 
 OpenStreetMap puede aportar candidatos con `amenity=drinking_water`, `amenity=fountain` combinado con `drinking_water=yes`, `fountain=drinking` y, como indicio a revisar, `drinking_water=yes`. No se considera potable por la mera presencia de un objeto: se requiere una etiqueta explícita compatible y la procedencia se mantiene como comunitaria. Los datos OSM se publican bajo ODbL y requieren atribución a los colaboradores; derivados de bases de datos pueden tener obligaciones share-alike.
 
-La consulta puntual de Overpass del 16/10/2026 devolvió 526 elementos `amenity=drinking_water` en el área de consulta; tres con acceso `private`/`no` se excluyeron. El snapshot local contiene 523 candidatos, con timestamp de base OSM `2026-10-16T10:41:20Z`. Se conservan separados y con icono morado, confianza media, URL de objeto y etiqueta comunitaria. Una etiqueta `disused:*`/`abandoned` se muestra como estado comunitario, nunca como municipal. No se deduplican automáticamente contra puntos municipales porque proximidad no demuestra identidad.
+La consulta puntual de Overpass del 16/10/2026 devolvió 526 elementos `amenity=drinking_water` en el área de consulta; tres con acceso `private`/`no` se excluyeron. El snapshot local contiene 523 candidatos, con timestamp de base OSM `2026-10-16T10:41:20Z`. Los puntos sin coincidencia fiable se muestran con icono morado, confianza media, URL de objeto y etiqueta comunitaria. Una etiqueta `disused:*`/`abandoned` se muestra como estado comunitario, nunca como municipal. Las coincidencias se agrupan bajo el punto municipal solo si están a 15 m o menos, tienen evidencia coincidente de calle o ubicación y forman una pareja única; la ficha municipal conserva un enlace al registro comunitario. La proximidad sola no demuestra identidad y los casos ambiguos permanecen visibles.
 
 ## Estrategia de normalización y deduplicación
 
-El WFS municipal se descarga en EPSG:4326 a un snapshot versionado. `codigo`/ID de entidad se preservan como identificador y nunca se deduplican entre sí si solo están próximas (el conjunto tiene fuentes contiguas que pueden estar a pocos metros). El importador OSM conserva ID, geometría, etiquetas, licencia y timestamp; excluye candidatos sin etiquetas explícitas de agua potable y acceso `private`/`no`. Los puntos OSM no se fusionan espacialmente con los municipales. Ambos identificadores y la procedencia quedan visibles para que futuras conciliaciones sean revisables. Las fuentes municipales tienen confianza alta en su procedencia; OSM tiene confianza media en la procedencia comunitaria, no en su estado actual.
+El WFS municipal se descarga en EPSG:4326 a un snapshot versionado. `codigo`/ID de entidad se preservan como identificador y nunca se deduplican entre sí si solo están próximas (el conjunto tiene fuentes contiguas que pueden estar a pocos metros). El importador OSM conserva ID, geometría, etiquetas, licencia y timestamp; excluye candidatos sin etiquetas explícitas de agua potable y acceso `private`/`no`. La conciliación municipal-OSM requiere distancia máxima de 15 m, evidencia normalizada coincidente y relación única más cercana en ambas direcciones; los casos ambiguos se mantienen separados. Ambos identificadores y procedencias quedan enlazados para que la conciliación sea revisable. Las fuentes municipales tienen confianza alta en su procedencia; OSM tiene confianza media en la procedencia comunitaria, no en su estado actual.
 
 ## Actualización
 
@@ -33,3 +37,13 @@ Para actualizar los candidatos OSM, ejecute `npm run osm:update`. Realiza una co
 - Geocodificación: búsqueda puntual en Nominatim (máximo 1 consulta por segundo, sin autocompletado), con atribución OSM y [política de uso](https://operations.osmfoundation.org/policies/nominatim/). La consulta ocurre solo al enviar la búsqueda y no se transmite la ubicación del usuario como dirección. El cliente aplica un intervalo mínimo y la API limita consultas por instancia.
 - Navegación: cada ficha ofrece enlaces a Google Maps y Apple Maps. La distancia calculada en Fuentes Zaragoza es en línea recta, no una ruta a pie.
 - No se encontró en el catálogo consultado un conjunto del Gobierno de Aragón que sustituya el inventario municipal de fuentes. La calidad del agua municipal trata muestreos/redes de consumo, no ubicación/estado de fuentes individuales.
+
+## Propuestas comunitarias
+
+La página `/proponer` permite enviar una fuente que no aparece en las capas municipal ni OSM. La coordenada exacta es obligatoria; nombre, referencia de ubicación y descripción son opcionales. Se informa al usuario de que las coordenadas se harán públicas si la propuesta se aprueba. No se solicita correo ni otros datos personales. Las propuestas quedan en estado `pending` y no se sirven en el mapa; solo las filas `approved` se publican con procedencia propia «Fuente propuesta (comunidad)». No se altera el inventario municipal ni la procedencia OSM.
+
+La revisión está en `/moderacion`. Inicie sesión con Supabase Auth; la API vuelve a validar cada token y su correo debe figurar en `MODERATOR_EMAILS`. La lista se configura solo en el servidor. Las transiciones aceptadas por la API son de pendiente a aprobada o rechazada. Una coincidencia a menos de 100 m genera un aviso a quien propone, pero no descarta el envío automáticamente.
+
+Para habilitar esta función, cree un proyecto Supabase, ejecute `supabase/migrations/202610170001_community_sources.sql` y copie `.env.example` a `.env.local`. Configure `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` y `MODERATOR_EMAILS` (correos separados por coma). El rol de servicio es secreto: no lo prefije con `NEXT_PUBLIC_`, no lo suba al repositorio ni lo incluya en capturas o registros. Invite las cuentas de moderación desde Supabase Auth y active contraseña u otro proveedor permitido en su proyecto. Sin configuración, las páginas informan que la función no está disponible y las API responden 503.
+
+La tabla tiene RLS habilitado; el acceso público solo puede leer filas aprobadas. Los envíos y cambios de estado pasan por endpoints de servidor con validación; los cambios requieren token válido y correo autorizado. La limitación de cinco propuestas por hora es por dirección de red y en memoria del proceso, por lo que no es global ni persistente entre instancias.

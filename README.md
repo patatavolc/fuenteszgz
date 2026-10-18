@@ -4,7 +4,7 @@ Aplicación web personal mobile-first para localizar fuentes públicas para bebe
 
 ## Requisitos y desarrollo
 
-- Node.js 20.9 o superior y npm.
+- Node.js 22 o superior y npm. El cliente oficial de Supabase utilizado para propuestas comunitarias requiere Node.js 22+.
 - Clona el repositorio existente y ejecuta:
 
 ```sh
@@ -32,22 +32,23 @@ npm run test:e2e
 
 En la revisión del proyecto, `npm audit --omit=dev` no reportó vulnerabilidades de producción. El audit completo sí señala 5 avisos altos en la cadena de herramientas de ESLint (`braces`/`micromatch` bajo `eslint-config-next`), instalada solo para desarrollo y lint; se deben reevaluar al actualizarla.
 
-La aplicación no necesita cuenta, base de datos ni clave para explorar los inventarios. Al entrar se solicita permiso para usar la ubicación; si se deniega, se puede elegir el origen en el mapa. En producción requiere HTTPS. Los favoritos e incidencias comunitarias son locales al navegador. El catálogo municipal autoriza la reutilización comercial y no comercial bajo condiciones de atribución, fecha y no respaldo institucional; véase el aviso municipal en la documentación.
+La aplicación no necesita cuenta, base de datos ni clave para explorar los inventarios. La ubicación solo se solicita al pulsar el botón para seguirla; si se deniega, se puede elegir el origen en el mapa. En producción requiere HTTPS. Los favoritos e incidencias comunitarias son locales al navegador. El catálogo municipal autoriza la reutilización comercial y no comercial bajo condiciones de atribución, fecha y no respaldo institucional; véase el aviso municipal en la documentación.
 
 ## Funciones
 
-- Mapa Leaflet con agrupación progresiva de marcadores, controles de zoom táctiles, atribución OSM y selección de fuente.
+- Mapa Leaflet con agrupación progresiva de marcadores, controles de zoom táctiles, atribución OSM y selección de fuente. Las coincidencias fiables aparecen con pin municipal y la referencia comunitaria queda enlazada en la ficha.
 - Resultados cercanos ordenados por distancia en línea recta; distancia siempre identificada como tal.
 - Búsqueda local en nombres/ubicaciones y búsqueda puntual de direcciones con Nominatim al enviar el formulario (sin autocompletado).
-- Solicitud de geolocalización al entrar, localización puntual y seguimiento explícito con botón para detenerlo. También se puede elegir origen tocando el mapa.
+- Localización puntual bajo demanda. También se puede elegir origen tocando el mapa.
 - Filtros combinables de distancia, zonas verdes identificadas, estado y exclusión estacional cuando OSM aporta esa etiqueta. La ficha muestra accesibilidad solo cuando el dato existe.
 - Ficha con procedencia, estado disponible, favoritos locales, incidencias locales y enlaces a Google/Apple Maps.
+- Formulario para proponer una fuente. Las propuestas se almacenan como pendientes de revisión y nunca se añaden automáticamente al mapa.
 
 ## Datos, licencias y limitaciones
 
 El inventario procede del [catálogo municipal de Fuentes de agua para beber](https://www.zaragoza.es/web/espacio-de-datos/servicio/catalogo/2860), con capa WFS IDEZar `medioambiente:fuente_agua_potable`. La ficha describe 697 elementos y última actualización 13/07/2023. En la consulta del 16/10/2026 el WFS anunció 653; se pudieron recuperar 650 geometrías en EPSG:4326 tras errores de reproyección en tres índices. No se afirma que la cobertura sea completa. `en_servicio` se presenta como dato del Ayuntamiento, no como garantía de que la fuente funcione hoy. No hay fecha de inspección individual.
 
-OpenStreetMap aporta también 523 candidatos comunitarios consultados el 16/10/2026 mediante Overpass. Se muestran diferenciados de las fuentes municipales y como no confirmados oficialmente. La consulta selecciona `amenity=drinking_water` y otras etiquetas explícitas de agua potable; excluye elementos etiquetados con acceso privado/no. Sus teselas y datos requieren atribución OSM y están bajo sus condiciones (ODbL para la base de datos). Las teselas estándar son de mejor esfuerzo y no ofrecen capacidad ilimitada; el mapa solo pide teselas visibles, sin descarga offline ni precarga. Para cargas elevadas debe configurarse un proveedor compatible.
+OpenStreetMap aporta también 523 candidatos comunitarios consultados el 16/10/2026 mediante Overpass. Los candidatos sin coincidencia fiable se muestran diferenciados de las fuentes municipales y como no confirmados oficialmente; las coincidencias fiables se agrupan bajo el registro municipal y conservan un enlace al dato OSM en la ficha. La consulta selecciona `amenity=drinking_water` y otras etiquetas explícitas de agua potable; excluye elementos etiquetados con acceso privado/no. Sus teselas y datos requieren atribución OSM y están bajo sus condiciones (ODbL para la base de datos). Las teselas estándar son de mejor esfuerzo y no ofrecen capacidad ilimitada; el mapa solo pide teselas visibles, sin descarga offline ni precarga. Para cargas elevadas debe configurarse un proveedor compatible.
 
 Consulta [Fuentes, licencias y límites](docs/FUENTES-DE-DATOS.md) y la página `/fuentes` en la aplicación. Este producto no es información de emergencia; comprueba la fuente en el lugar.
 
@@ -63,13 +64,19 @@ La búsqueda se hace explícitamente mediante `/api/geocode` y Nominatim. No se 
 
 Las incidencias se validan y guardan en localStorage. No se envían al Ayuntamiento, no son compartidas, no modifican el estado oficial y pueden borrarse al limpiar los datos del navegador. La ubicación no se guarda ni se envía a Fuentes Zaragoza. Véase `/privacidad`.
 
+## Propuestas de fuentes (Supabase opcional)
+
+El formulario `/proponer` envía coordenadas y texto a `/api/fountain-proposals`. Sin configuración de Supabase, el endpoint responde que el envío compartido no está disponible; no simula que la propuesta se haya guardado. Para activarlo, crea un proyecto Supabase, ejecuta `supabase/migrations/20261018000000_fountain_proposals.sql` en su SQL Editor y configura `SUPABASE_URL` y `SUPABASE_ANON_KEY` (la clave pública/anon, nunca una service role key) en `.env.local` y en el entorno de despliegue.
+
+La tabla solo permite inserciones anónimas con estado `pending`; no ofrece lectura, edición ni borrado anónimo. Revisa y cambia el estado desde el panel autenticado de Supabase. Una propuesta aprobada tampoco aparece por sí sola en la app: debe verificarse y añadirse expresamente al inventario versionado. El envío incluye las coordenadas y los campos de texto; no se recopilan nombre, correo ni cuenta. El acceso público puede recibir spam: antes de abrir el servicio a mucho tráfico, añade protección contra abuso adecuada al despliegue.
+
 ## Despliegue en Vercel
 
 1. Importa el repositorio existente en Vercel y deja Framework Preset en Next.js.
-2. Usa Node.js 20.x o superior; el comando de build es `npm run build`.
+2. Usa Node.js 22.x o superior; el comando de build es `npm run build`.
 3. Despliega. La geolocalización funcionará bajo HTTPS.
 
-No se necesita configurar almacenamiento remoto. El snapshot local se empaqueta con la app. Verifica que el proveedor cartográfico y sus licencias aceptan tu volumen previsto; OSM estándar es para uso moderado y sin SLA.
+Para habilitar propuestas, aplica la migración Supabase descrita en [Fuentes, licencias y límites](docs/FUENTES-DE-DATOS.md) y configura las variables de entorno de `.env.example` en Vercel. El snapshot municipal y OSM sigue empaquetado con la app. Verifica que el proveedor cartográfico y sus licencias aceptan tu volumen previsto; OSM estándar es para uso moderado y sin SLA.
 
 ## Arquitectura
 
