@@ -50,6 +50,26 @@ describe("escritura atómica de snapshots validados", () => {
     expect(await readdir(directory)).toEqual(["snapshot.geojson"]);
   });
 
+  it("acepta exactamente el 95 % de cobertura municipal y conserva el snapshot si OSM no aporta candidatos válidos", async () => {
+    const directory = await createDirectory();
+    const municipalPath = join(directory, "municipal.geojson");
+    const osmPath = join(directory, "osm.geojson");
+    await writeFile(municipalPath, "municipal anterior", "utf8");
+    await writeFile(osmPath, "osm anterior", "utf8");
+    const municipal = { type: "FeatureCollection", features: Array.from({ length: 95 }, (_, index) => ({
+      type: "Feature", id: `source.${index}`, geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { codigo: `F${index}` },
+    })) };
+    const validMunicipal = validateSnapshot(municipal, "municipal");
+    const invalidOsm = validateSnapshot({ type: "FeatureCollection", features: [] }, "osm");
+
+    await writeValidatedSnapshotAtomically(municipalPath, municipal, validMunicipal, { expected: 100 });
+    await expect(writeValidatedSnapshotAtomically(osmPath, { type: "FeatureCollection", features: [] }, invalidOsm)).rejects.toThrow("No quedan registros válidos");
+
+    expect(JSON.parse(await readFile(municipalPath, "utf8")).features).toHaveLength(95);
+    expect(await readFile(osmPath, "utf8")).toBe("osm anterior");
+    expect((await readdir(directory)).sort()).toEqual(["municipal.geojson", "osm.geojson"]);
+  });
+
   it("mantiene el destino y limpia el temporal si falla el reemplazo", async () => {
     const directory = await createDirectory();
     const destination = join(directory, "snapshot.geojson");

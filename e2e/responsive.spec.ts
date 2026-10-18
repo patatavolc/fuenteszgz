@@ -142,3 +142,31 @@ test("search, filters, fountain details and favorites work on mobile and desktop
     await expect(page.getByRole("button", { name: /Favoritos/ })).toBeVisible();
   }
 });
+
+test("empty results, geocoding errors and accessible control states are announced", async ({ page }) => {
+  await page.route("https://tile.openstreetmap.org/**", (route) => route.abort());
+  await page.route("**/api/geocode", (route) => route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "El geocodificador no responde." }) }));
+  await page.goto("/");
+
+  await expect(page.getByRole("main")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Buscar un lugar" })).toBeVisible();
+  const search = page.getByRole("textbox", { name: "Buscar dirección, parque o fuente" });
+  await search.fill("Calle Mayor");
+  await page.getByRole("button", { name: "Buscar" }).click();
+  await expect(page.getByRole("alert")).toHaveText("El geocodificador no responde.");
+  await expect(search).toBeVisible();
+
+  await search.fill("lugar sin coincidencias 83920");
+  await expect(page.getByText("No hay fuentes con estos filtros")).toBeVisible();
+  const clear = page.getByRole("button", { name: "Quitar filtros" });
+  await expect(clear).toBeVisible();
+  await clear.click();
+  await expect(page.locator(".result-row").first()).toBeVisible();
+
+  const filters = page.getByRole("button", { name: /Filtros/ });
+  await filters.focus();
+  await page.keyboard.press("Enter");
+  await expect(filters).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("slider", { name: /Distancia máxima/ })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: /Solo parques y zonas verdes identificados/ })).toBeVisible();
+});
