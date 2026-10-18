@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deduplicateFountains, distanceMeters, findNearby, normalizeMunicipalData, normalizeMunicipalDataWithReport, normalizeOsmDataWithReport } from "@/lib/data";
+import { buildPrioritizedDisplaySet, deduplicateFountains, distanceMeters, findNearby, normalizeMunicipalData, normalizeMunicipalDataWithReport, normalizeOsmDataWithReport } from "@/lib/data";
 import type { Fountain } from "@/lib/types";
 
 const fountain = (id: string, lat: number, lon: number, overrides: Partial<Fountain> = {}): Fountain => ({

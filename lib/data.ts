@@ -1,7 +1,7 @@
 import collection from "@/data/municipal-snapshot.geojson";
 import osmCollection from "@/data/osm-candidates.geojson";
 import { validateSnapshot, type SnapshotValidationReport } from "./snapshot-validation";
-import type { Fountain, OperatingStatus, Point } from "./types";
+import type { CommunitySource, Fountain, OperatingStatus, Point } from "./types";
 
 export function normalizeMunicipalData(input: unknown): Fountain[] {
   return normalizeMunicipalDataWithReport(input).fountains;

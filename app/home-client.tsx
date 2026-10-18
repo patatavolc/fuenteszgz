@@ -50,7 +50,7 @@ function useLocation() {
   useEffect(() => () => {
     if (watchId.current !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId.current);
   }, []);
-  return { state, point, locate };
+  return { state, point, following, toggleFollowing };
 }
 
 export default function HomeClient() {
@@ -124,7 +124,6 @@ export default function HomeClient() {
     setSheetCollapsed(false);
     setSelected(null);
   };
-  const chooseFountain = useCallback((fountain: Fountain) => { setSelected(fountain); setRecenter(fountain); }, []);
   const acceptSourcePoint = useCallback((point: Point) => { sourcePointCallback.current?.(point); sourcePointCallback.current = null; setSelectingSource(false); setShowProposal(true); setNotice("Ubicación seleccionada. Completa los datos y envía la propuesta para revisión."); }, []);
   const toggleFavorite = (id: string) => setFavoriteIds(saveFavorite(id));
 

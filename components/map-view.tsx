@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CircleMarker, MapContainer, Marker, TileLayer, ZoomControl, useMap, useMapEvents } from "react-leaflet";
 import "leaflet.markercluster";
 import L from "leaflet";
+import { reconcileMarkers, type MarkerEntry } from "@/lib/marker-reconciliation";
 import type { Fountain, Point } from "@/lib/types";
 
 const userIcon = L.divIcon({ className: "", html: '<span class="user-pin"><i></i></span>', iconSize: [22, 22], iconAnchor: [11, 11] });
@@ -41,20 +42,63 @@ const statusLabel = (status: Fountain["status"]) => ({
 
 function ClusteredFountains({ fountains, onSelect }: { fountains: Fountain[]; onSelect: (fountain: Fountain) => void }) {
   const map = useMap();
+  const groupRef = useRef<L.MarkerClusterGroup | null>(null);
+  const markerEntriesRef = useRef(new Map<string, MarkerEntry<Fountain, L.Marker>>());
+  const onSelectRef = useRef(onSelect);
+  const initialLoadPreparedRef = useRef(false);
+  const [groupReady, setGroupReady] = useState(false);
+  onSelectRef.current = onSelect;
+
   useEffect(() => {
-    const group = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 42, showCoverageOnHover: false });
-    fountains.forEach((fountain) => {
+    const markerEntries = markerEntriesRef.current;
+    setGroupReady(false);
+    initialLoadPreparedRef.current = false;
+    const group = L.markerClusterGroup({
+      chunkedLoading: true,
+      maxClusterRadius: 42,
+      showCoverageOnHover: false,
+      chunkProgress(processed, total) {
+        if (processed >= total && groupRef.current === group) setGroupReady(true);
+      },
+    });
+    groupRef.current = group;
+    return () => {
+      groupRef.current = null;
+      markerEntries.clear();
+      initialLoadPreparedRef.current = false;
+    };
+  }, [map]);
+
+  useEffect(() => {
+    const group = groupRef.current;
+    if (!group) return;
+    if (initialLoadPreparedRef.current && !groupReady) return;
+    initialLoadPreparedRef.current = true;
+    const markerEntries = markerEntriesRef.current;
+
+    reconcileMarkers(markerEntries, fountains, (markers) => group.removeLayers(markers), (fountain) => {
       const community = fountain.source !== "Ayuntamiento de Zaragoza";
       const sourceLabel = fountain.source === "OpenStreetMap (comunidad)" ? "OpenStreetMap, comunidad" : fountain.source === "Ayuntamiento de Zaragoza" ? "Ayuntamiento de Zaragoza" : "propuesta comunitaria aprobada";
       const accessibleLabel = `${fountain.name}, ${statusLabel(fountain.status)}, ${sourceLabel}`;
       const marker = L.marker([fountain.lat, fountain.lon], { icon: fountainIcon(fountain.status, community), title: accessibleLabel, alt: accessibleLabel, keyboard: true });
       marker.bindTooltip(`${fountain.name} · ${statusLabel(fountain.status)} · ${sourceLabel}`, { direction: "top", offset: [0, -4] });
-      marker.on("click", () => onSelect(fountain));
-      group.addLayer(marker);
+      marker.on("click", () => onSelectRef.current(fountain));
+      return marker;
+    }, (markers) => {
+      const groupOptions = group.options as L.MarkerClusterGroupOptions;
+      const chunkedLoading = groupOptions.chunkedLoading;
+      // Finish a delta synchronously so a rapid next filter cannot race a pending chunk.
+      if (map.hasLayer(group)) groupOptions.chunkedLoading = false;
+      try { group.addLayers(markers); } finally { groupOptions.chunkedLoading = chunkedLoading; }
     });
+  }, [fountains, groupReady, map]);
+
+  useEffect(() => {
+    const group = groupRef.current;
+    if (!group) return;
     map.addLayer(group);
     return () => { map.removeLayer(group); };
-  }, [fountains, map, onSelect]);
+  }, [map]);
   return null;
 }
 
