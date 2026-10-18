@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import municipalSnapshot from "@/data/municipal-snapshot.geojson";
 import { buildPrioritizedDisplaySet, deduplicateFountains, distanceMeters, findNearby, normalizeMunicipalData, normalizeMunicipalDataWithReport, normalizeOsmDataWithReport } from "@/lib/data";
 import type { Fountain } from "@/lib/types";
 
@@ -34,7 +35,39 @@ describe("normalización municipal", () => {
     const a = fountain("a", 41.65, -.88, { name: "Fuente A" });
     const near = fountain("b", 41.65001, -.88, { name: "Fuente A" });
     const other = fountain("osm", 41.65, -.88, { name: "Fuente A", source: "OpenStreetMap (comunidad)" });
-    expect(deduplicateFountains([a, near, other])).toHaveLength(2);
+    expect(deduplicateFountains([a, near, other])).toHaveLength(3);
+  });
+
+  it("conserva fuentes municipales distintas con códigos oficiales aunque compartan nombre y ubicación", () => {
+    const result = normalizeMunicipalData({ type: "FeatureCollection", features: [
+      { type: "Feature", id: "source.1", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { codigo: "F1", vial: "Calle Mayor" } },
+      { type: "Feature", id: "source.2", geometry: { type: "Point", coordinates: [-.880001, 41.65] }, properties: { codigo: "F2", vial: "Calle Mayor" } },
+    ] });
+
+    expect(result.map(({ officialCode }) => officialCode)).toEqual(["F1", "F2"]);
+  });
+
+  it("conserva todos los registros del snapshot municipal actual", () => {
+    const snapshot = municipalSnapshot as { features: unknown[] };
+    expect(normalizeMunicipalData(snapshot)).toHaveLength(snapshot.features.length);
+  });
+
+  it("no atribuye a la base OSM una fecha local generada", () => {
+    const { fountains } = normalizeOsmDataWithReport({ type: "FeatureCollection", generatedAt: "2026-10-18T10:00:00Z", features: [
+      { type: "Feature", id: "node/1", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { tags: { amenity: "drinking_water" } } },
+    ] });
+
+    expect(fountains[0].sourceUpdatedAt).toBeUndefined();
+    expect(fountains[0].snapshotGeneratedAt).toBe("2026-10-18T10:00:00Z");
+  });
+
+  it("normaliza identificadores OSM válidos con prefijo para la interfaz y el enlace de origen", () => {
+    const { fountains, report } = normalizeOsmDataWithReport({ type: "FeatureCollection", features: [
+      { type: "Feature", id: "osm:node/9", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { tags: { amenity: "drinking_water" } } },
+    ] });
+
+    expect(report).toMatchObject({ accepted: 1, discarded: 0 });
+    expect(fountains[0]).toMatchObject({ id: "osm:node/9", sourceUrl: "https://www.openstreetmap.org/node/9" });
   });
 
   it("acepta únicamente etiquetas OSM explícitas y conserva procedencia/estacionalidad", () => {

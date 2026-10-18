@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatSnapshotValidationReport, meetsSnapshotCoverage, validateSnapshot } from "@/lib/snapshot-validation";
+import { compareSnapshotIds, formatSnapshotValidationReport, meetsSnapshotCoverage, validateSnapshot } from "@/lib/snapshot-validation";
 
 describe("validación común de snapshots", () => {
   it("valida tipos, coordenadas e identificadores municipales y reporta cada descarte", () => {
@@ -53,5 +53,83 @@ describe("validación común de snapshots", () => {
     expect(meetsSnapshotCoverage(95, 100)).toBe(true);
     expect(meetsSnapshotCoverage(94, 100)).toBe(false);
     expect(meetsSnapshotCoverage(0, 0)).toBe(false);
+  });
+
+  it("descarta y reporta identificadores lógicos duplicados con índice e identificador", () => {
+    const result = validateSnapshot({ type: "FeatureCollection", features: [
+      { type: "Feature", id: "source.1", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { codigo: "F1" } },
+      { type: "Feature", id: "source.2", geometry: { type: "Point", coordinates: [-.89, 41.65] }, properties: { codigo: "F1" } },
+    ] }, "municipal");
+
+    expect(result.features).toHaveLength(1);
+    expect(result.report).toMatchObject({ total: 2, accepted: 1, discarded: 1, discardedByReason: { "duplicate-id": 1 } });
+    expect(result.report.discardDetails).toEqual([{ index: 1, id: "source.2", reason: "duplicate-id" }]);
+  });
+
+  it("advierte sobre puntos OSM fuera del rectángulo consultado sin descartarlos", () => {
+    const result = validateSnapshot({ type: "FeatureCollection", queryBounds: "41.56,-1.05,41.76,-0.70", features: [
+      { type: "Feature", id: "node/1", geometry: { type: "Point", coordinates: [-1.06, 41.65] }, properties: { tags: { amenity: "drinking_water" } } },
+    ] }, "osm");
+
+    expect(result.features).toHaveLength(1);
+    expect(result.report).toMatchObject({ accepted: 1, discarded: 0, warnings: [{ index: 0, id: "node/1", reason: "outside-query-bounds" }] });
+    expect(formatSnapshotValidationReport(result.report)).toContain("Advertencias:");
+  });
+
+  it.each(["osm:", "osm:   ", "  osm:\t  "])("descarta y reporta el ID OSM vacío tras normalizar %j", (id) => {
+    const result = validateSnapshot({ type: "FeatureCollection", features: [
+      { type: "Feature", id, geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { tags: { amenity: "drinking_water" } } },
+    ] }, "osm");
+
+    expect(result.features).toHaveLength(0);
+    expect(result.report.discardDetails).toEqual([{ index: 0, id, reason: "missing-id" }]);
+  });
+
+  it("conserva IDs OSM válidos normalizados al comparar snapshots", () => {
+    const snapshot = (id: string) => ({ type: "FeatureCollection", features: [
+      { type: "Feature", id, geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { tags: { amenity: "drinking_water" } } },
+    ] });
+
+    expect(compareSnapshotIds(snapshot("osm:node/1"), snapshot("node/2"), "osm"))
+      .toEqual({ added: ["node/2"], removed: ["node/1"] });
+  });
+
+  it("no omite IDs inválidos del snapshot anterior durante la comparación", () => {
+    const previous = { type: "FeatureCollection", features: [
+      { type: "Feature", id: "osm:", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { tags: { amenity: "drinking_water" } } },
+    ] };
+    const next = { type: "FeatureCollection", features: [
+      { type: "Feature", id: "node/2", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { tags: { amenity: "drinking_water" } } },
+    ] };
+
+    expect(() => compareSnapshotIds(previous, next, "osm")).toThrow(/snapshot anterior inválido.*índice 0 \(osm:\): missing-id/i);
+  });
+
+  it("resume IDs añadidos y retirados para revisar el efecto de una actualización", () => {
+    const changes = compareSnapshotIds(
+      { type: "FeatureCollection", features: [
+        { type: "Feature", id: "F1", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { codigo: "F1" } },
+        { type: "Feature", id: "F2", geometry: { type: "Point", coordinates: [-.89, 41.65] }, properties: { codigo: "F2" } },
+      ] },
+      { type: "FeatureCollection", features: [
+        { type: "Feature", id: "F2", geometry: { type: "Point", coordinates: [-.89, 41.65] }, properties: { codigo: "F2" } },
+        { type: "Feature", id: "F3", geometry: { type: "Point", coordinates: [-.90, 41.65] }, properties: { codigo: "F3" } },
+      ] },
+      "municipal",
+    );
+
+    expect(changes).toEqual({ added: ["F3"], removed: ["F1"] });
+  });
+
+  it.each([
+    ["sin features", { type: "FeatureCollection" }],
+    ["features con tipo incorrecto", { type: "FeatureCollection", features: {} }],
+    ["con una entidad inválida", { type: "FeatureCollection", features: [{}] }],
+  ])("rechaza un snapshot anterior %s al comparar", (_description, previous) => {
+    const next = { type: "FeatureCollection", features: [
+      { type: "Feature", id: "F1", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { codigo: "F1" } },
+    ] };
+
+    expect(() => compareSnapshotIds(previous, next, "municipal")).toThrow(/snapshot anterior inválido/i);
   });
 });

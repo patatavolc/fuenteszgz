@@ -19,6 +19,8 @@ export type Fountain = Point & {
   source: Provenance;
   sourceUrl: string;
   sourceUpdatedAt?: string;
+  /** Local generation time for the snapshot; it is not a source update time. */
+  snapshotGeneratedAt?: string;
   confidence: "alta" | "media";
   osmTags?: Record<string, string>;
   matchedOsm?: Fountain[];

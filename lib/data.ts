@@ -39,7 +39,10 @@ export function normalizeOsmData(input: unknown): Fountain[] {
 
 export function normalizeOsmDataWithReport(input: unknown): { fountains: Fountain[]; report: SnapshotValidationReport } {
   const { features, report } = validateSnapshot(input, "osm");
-  const metadata = input && typeof input === "object" ? input as { timestamp?: unknown } : {};
+  const metadata = input && typeof input === "object" ? input as { timestamp?: unknown; sourceTimestamp?: unknown; generatedAt?: unknown } : {};
+  const sourceUpdatedAt = typeof metadata.sourceTimestamp === "string" ? metadata.sourceTimestamp
+    : typeof metadata.timestamp === "string" ? metadata.timestamp : undefined;
+  const snapshotGeneratedAt = typeof metadata.generatedAt === "string" ? metadata.generatedAt : undefined;
   const output: Fountain[] = [];
   for (const feature of features) {
     const coordinates = feature.geometry.coordinates;
@@ -58,7 +61,7 @@ export function normalizeOsmDataWithReport(input: unknown): { fountains: Fountai
       ...(location || tags.leisure === "park" ? { isGreenArea: true } : {}),
       ...(tags.seasonal && tags.seasonal !== "no" ? { seasonal: tags.seasonal } : {}),
       ...(tags.wheelchair ? { accessibility: tags.wheelchair } : {}), source: "OpenStreetMap (comunidad)",
-      sourceUrl: `https://www.openstreetmap.org/${id.replace("/", "/")}`, ...(typeof metadata.timestamp === "string" ? { sourceUpdatedAt: metadata.timestamp } : {}),
+      sourceUrl: `https://www.openstreetmap.org/${id}`, ...(sourceUpdatedAt ? { sourceUpdatedAt } : {}), ...(snapshotGeneratedAt ? { snapshotGeneratedAt } : {}),
       confidence: "media", osmTags: tags,
     });
   }
@@ -73,16 +76,15 @@ function clean(value: unknown): string | undefined {
 }
 
 export function deduplicateFountains(fountains: Fountain[], toleranceMeters = 15): Fountain[] {
-  const byId = new Map<string, Fountain>();
-  for (const fountain of fountains) {
-    if (!byId.has(fountain.id)) byId.set(fountain.id, fountain);
-  }
-  const seen: Fountain[] = [];
-  for (const fountain of byId.values()) {
-    const nearby = seen.find((item) => item.source === fountain.source && distanceMeters(item, fountain) <= toleranceMeters && item.name === fountain.name);
-    if (!nearby) seen.push(fountain);
-  }
-  return seen;
+  // Proximity is not identity evidence. Keep distinct records and only guard
+  // exact repeated IDs; the tolerance parameter remains for API compatibility.
+  void toleranceMeters;
+  const ids = new Set<string>();
+  return fountains.filter(({ id }) => {
+    if (ids.has(id)) return false;
+    ids.add(id);
+    return true;
+  });
 }
 
 export function distanceMeters(a: Point, b: Point): number {

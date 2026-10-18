@@ -20,12 +20,12 @@ describe("community source normalization", () => {
 
 describe("municipal display labels", () => {
   it("uses location and street for the label and retains the stable official code", () => {
-    const result = normalizeMunicipalData({ features: [{ id: "F-42", geometry: { type: "Point", coordinates: [-0.89, 41.65] }, properties: { codigo: "F-42", ubicacion: "Parque Grande", vial: "Paseo San Sebastián" } }] });
+    const result = normalizeMunicipalData({ type: "FeatureCollection", features: [{ type: "Feature", id: "F-42", geometry: { type: "Point", coordinates: [-0.89, 41.65] }, properties: { codigo: "F-42", ubicacion: "Parque Grande", vial: "Paseo San Sebastián" } }] });
     expect(result[0]).toMatchObject({ id: "municipal:F-42", name: "Parque Grande · Paseo San Sebastián", officialCode: "F-42" });
   });
 
   it("falls back to Fuente municipal while retaining the code", () => {
-    const result = normalizeMunicipalData({ features: [{ id: "F-43", geometry: { type: "Point", coordinates: [-0.89, 41.65] }, properties: { codigo: "F-43" } }] });
+    const result = normalizeMunicipalData({ type: "FeatureCollection", features: [{ type: "Feature", id: "F-43", geometry: { type: "Point", coordinates: [-0.89, 41.65] }, properties: { codigo: "F-43" } }] });
     expect(result[0]).toMatchObject({ name: "Fuente municipal", officialCode: "F-43" });
   });
 });

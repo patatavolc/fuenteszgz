@@ -18,13 +18,13 @@ function ClickOrigin({ enabled, onClick, selectingSource, onSourcePoint }: { ena
   useMapEvents({ click(event) { const point = { lat: event.latlng.lat, lon: event.latlng.lng }; if (selectingSource) onSourcePoint(point); else if (enabled) onClick(point); } });
   return null;
 }
-const fountainIcon = (status: Fountain["status"], community: boolean) => {
+const fountainIcon = (status: Fountain["status"], source: Fountain["source"]) => {
   const statusClass = status === "averiada" || status === "cerrada" || status === "fuera-de-servicio"
     ? "pin-off"
     : status === "desconocida" ? "pin-unknown" : "";
   return L.divIcon({
     className: "fountain-marker-icon",
-    html: `<span class="map-pin ${community ? "pin-community" : statusClass}" aria-hidden="true"><i></i></span>`,
+    html: `<span class="map-pin ${source === "OpenStreetMap (comunidad)" ? "pin-community" : source === "Fuente propuesta (comunidad)" ? "pin-proposal" : statusClass}" aria-hidden="true"><i></i></span>`,
     iconSize: [38, 38],
     // The rotated pin's tip sits at the bottom center of the icon box.
     iconAnchor: [19, 37],
@@ -77,10 +77,9 @@ function ClusteredFountains({ fountains, onSelect }: { fountains: Fountain[]; on
     const markerEntries = markerEntriesRef.current;
 
     reconcileMarkers(markerEntries, fountains, (markers) => group.removeLayers(markers), (fountain) => {
-      const community = fountain.source !== "Ayuntamiento de Zaragoza";
       const sourceLabel = fountain.source === "OpenStreetMap (comunidad)" ? "OpenStreetMap, comunidad" : fountain.source === "Ayuntamiento de Zaragoza" ? "Ayuntamiento de Zaragoza" : "propuesta comunitaria aprobada";
       const accessibleLabel = `${fountain.name}, ${statusLabel(fountain.status)}, ${sourceLabel}`;
-      const marker = L.marker([fountain.lat, fountain.lon], { icon: fountainIcon(fountain.status, community), title: accessibleLabel, alt: accessibleLabel, keyboard: true });
+      const marker = L.marker([fountain.lat, fountain.lon], { icon: fountainIcon(fountain.status, fountain.source), title: accessibleLabel, alt: accessibleLabel, keyboard: true });
       marker.bindTooltip(`${fountain.name} · ${statusLabel(fountain.status)} · ${sourceLabel}`, { direction: "top", offset: [0, -4] });
       marker.on("click", () => onSelectRef.current(fountain));
       return marker;
