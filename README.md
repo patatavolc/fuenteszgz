@@ -42,7 +42,7 @@ La aplicación no necesita cuenta, base de datos ni clave para explorar los inve
 - Seguimiento continuo de ubicación al pulsar el botón, con opción para detenerlo. También se puede elegir origen tocando el mapa.
 - Filtros combinables de distancia, zonas verdes identificadas, estado y exclusión estacional cuando OSM aporta esa etiqueta. La ficha muestra accesibilidad solo cuando el dato existe.
 - Ficha con procedencia, estado disponible, favoritos locales, incidencias locales y enlaces a Google/Apple Maps.
-- Propuestas de fuentes con revisión manual y publicación comunitaria tras aprobación; requiere Supabase configurado.
+- Formulario para proponer una fuente. Las propuestas se almacenan como pendientes de revisión y nunca se añaden automáticamente al mapa.
 
 ## Datos, licencias y limitaciones
 
@@ -63,6 +63,12 @@ La búsqueda se hace explícitamente mediante `/api/geocode` y Nominatim. No se 
 ## Incidencias y privacidad
 
 Las incidencias se validan y guardan en localStorage. No se envían al Ayuntamiento, no son compartidas, no modifican el estado oficial y pueden borrarse al limpiar los datos del navegador. La ubicación no se guarda ni se envía a Fuentes Zaragoza. Véase `/privacidad`.
+
+## Propuestas de fuentes (Supabase opcional)
+
+El formulario `/proponer` envía coordenadas y texto a `/api/fountain-proposals`. Sin configuración de Supabase, el endpoint responde que el envío compartido no está disponible; no simula que la propuesta se haya guardado. Para activarlo, crea un proyecto Supabase, ejecuta `supabase/migrations/20261018000000_fountain_proposals.sql` en su SQL Editor y configura `SUPABASE_URL` y `SUPABASE_ANON_KEY` (la clave pública/anon, nunca una service role key) en `.env.local` y en el entorno de despliegue.
+
+La tabla solo permite inserciones anónimas con estado `pending`; no ofrece lectura, edición ni borrado anónimo. Revisa y cambia el estado desde el panel autenticado de Supabase. Una propuesta aprobada tampoco aparece por sí sola en la app: debe verificarse y añadirse expresamente al inventario versionado. El envío incluye las coordenadas y los campos de texto; no se recopilan nombre, correo ni cuenta. El acceso público puede recibir spam: antes de abrir el servicio a mucho tráfico, añade protección contra abuso adecuada al despliegue.
 
 ## Despliegue en Vercel
 

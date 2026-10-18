@@ -206,7 +206,7 @@ export default function HomeClient() {
       {notice && <div className="toast" role="status">{notice}<button aria-label="Cerrar aviso" onClick={() => setNotice("")}><X size={16}/></button></div>}
       <div className="location-status" aria-live="polite">{location.state === "denegada" ? "Ubicación denegada. Puedes elegir el origen en el mapa." : location.state === "no-disponible" ? "Ubicación no disponible." : location.state === "pendiente" ? "Buscando ubicación precisa…" : location.state === "concedida" ? "Ubicación disponible" : ""}</div>
     </div>
-    <footer className="site-footer"><span><Droplets size={14}/> {municipalFountains.length} municipales + {osmFountains.length} candidatos OSM + {communityFountains.length} comunitarias aprobadas</span><Link href="/proponer">Añadir fuente</Link><Link href="/fuentes">Datos</Link><Link href="/privacidad">Privacidad</Link></footer>
+    <footer className="site-footer"><span><Droplets size={14}/> {municipalFountains.length} municipales + {osmFountains.length} candidatos OSM</span><Link href="/proponer">Proponer fuente</Link><Link href="/fuentes">Datos</Link><Link href="/privacidad">Privacidad</Link></footer>
   </main>;
 }
 
