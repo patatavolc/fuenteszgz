@@ -82,11 +82,21 @@ export default function HomeClient() {
   const [selectingSource, setSelectingSource] = useState(false);
   const sourcePointCallback = useRef<((point: Point) => void) | null>(null);
   const lastGeocodeAt = useRef(0);
+  const resultsListRef = useRef<HTMLDivElement>(null);
+  const resultsScrollTop = useRef(0);
+  const restoreResultsScroll = useRef(false);
   const sheetDragStart = useRef<number | null>(null);
   const sheetDragged = useRef(false);
 
   useEffect(() => { setFavoriteIds(getFavorites()); setIncidents(getIncidents()); }, []);
   useEffect(() => { fetch("/api/community-sources").then((response) => response.ok ? response.json() : []).then((data) => setCommunityFountains(normalizeCommunitySources(data))).catch(() => setCommunityFountains([])); }, []);
+
+  useEffect(() => {
+    if (!selected && restoreResultsScroll.current) {
+      if (resultsListRef.current) resultsListRef.current.scrollTop = resultsScrollTop.current;
+      restoreResultsScroll.current = false;
+    }
+  }, [selected]);
 
   const actualOrigin = useMemo(() => location.point && !hasChosenOrigin ? { ...location.point, label: "Tu ubicación" } : origin, [location.point, hasChosenOrigin, origin]);
   const allFountains = useMemo(() => [...fountains, ...communityFountains], [communityFountains]);
@@ -103,6 +113,17 @@ export default function HomeClient() {
     location.toggleFollowing(setRecenter);
   };
   const useMapOrigin = (point: Point) => { setOrigin({ ...point, label: "Punto elegido en el mapa" }); setHasChosenOrigin(true); setSelectingOrigin(false); };
+  const chooseFountain = useCallback((fountain: Fountain) => {
+    if (resultsListRef.current) resultsScrollTop.current = resultsListRef.current.scrollTop;
+    setSheetCollapsed(false);
+    setSelected(fountain);
+    setRecenter(fountain);
+  }, []);
+  const returnToResults = () => {
+    restoreResultsScroll.current = true;
+    setSheetCollapsed(false);
+    setSelected(null);
+  };
   const chooseFountain = useCallback((fountain: Fountain) => { setSelected(fountain); setRecenter(fountain); }, []);
   const acceptSourcePoint = useCallback((point: Point) => { sourcePointCallback.current?.(point); sourcePointCallback.current = null; setSelectingSource(false); setShowProposal(true); setNotice("Ubicación seleccionada. Completa los datos y envía la propuesta para revisión."); }, []);
   const toggleFavorite = (id: string) => setFavoriteIds(saveFavorite(id));
