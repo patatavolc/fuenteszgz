@@ -1,6 +1,6 @@
 import collection from "@/data/municipal-snapshot.geojson";
 import osmCollection from "@/data/osm-candidates.geojson";
-import type { Fountain, OperatingStatus, Point } from "./types";
+import type { CommunitySource, Fountain, OperatingStatus, Point } from "./types";
 
 type Feature = { id: string; geometry?: { type?: string; coordinates?: number[] }; properties?: Record<string, unknown> };
 type Collection = { features?: Feature[] };
@@ -20,8 +20,9 @@ export function normalizeMunicipalData(input: unknown): Fountain[] {
     const address = clean(properties.vial);
     const service = properties.en_servicio;
     const status: OperatingStatus = service === true ? "operativa" : service === false ? "fuera-de-servicio" : "desconocida";
+    const displayName = [location, address].filter(Boolean).join(" · ") || "Fuente municipal";
     output.push({
-      id: `municipal:${code}`, name: `Fuente ${code}`, ...(address ? { address } : {}), ...(location ? { location } : {}),
+      id: `municipal:${code}`, name: displayName, officialCode: code, ...(address ? { address } : {}), ...(location ? { location } : {}),
       ...(typeof properties.distrito === "string" ? { district: clean(properties.distrito) } : {}),
       ...(typeof properties.barrio === "string" ? { neighborhood: clean(properties.barrio) } : {}),
       lat, lon, status, ...(service === true || service === false ? { statusSource: "Ayuntamiento de Zaragoza · campo en_servicio" } : {}),
@@ -92,6 +93,28 @@ export function distanceMeters(a: Point, b: Point): number {
   const lat2 = b.lat * rad;
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
   return 6371000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+/** Normalize only records returned by the approved community-source API. */
+export function normalizeCommunitySources(input: unknown): Fountain[] {
+  if (!Array.isArray(input)) return [];
+  return input.flatMap((row): Fountain[] => {
+    if (!row || typeof row !== "object") return [];
+    const source = row as Partial<CommunitySource>;
+    if (source.status !== "approved" || typeof source.id !== "string"
+      || typeof source.lat !== "number" || typeof source.lon !== "number"
+      || !Number.isFinite(source.lat) || !Number.isFinite(source.lon)
+      || Math.abs(source.lat) > 90 || Math.abs(source.lon) > 180) return [];
+    const name = clean(source.name) ?? clean(source.location) ?? "Fuente comunitaria";
+    const location = clean(source.location);
+    const description = clean(source.description);
+    return [{
+      id: `community:${source.id}`, name, lat: source.lat, lon: source.lon,
+      ...(location ? { location } : {}), ...(description ? { description } : {}),
+      status: "desconocida", source: "Fuente propuesta (comunidad)",
+      sourceUrl: `/proponer#${encodeURIComponent(source.id)}`, confidence: "media", communityStatus: "approved",
+    }];
+  });
 }
 
 function normalizeEvidence(value: string | undefined): string | undefined {

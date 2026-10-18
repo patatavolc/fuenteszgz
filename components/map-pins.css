@@ -1,0 +1,48 @@
+/* Conventional map pin: the sharp lower point is anchored to the fountain's coordinates. */
+.leaflet-marker-icon.fountain-marker-icon {
+  background: transparent;
+  border: 0;
+}
+
+.leaflet-marker-icon .map-pin {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: block;
+  width: 26px;
+  height: 26px;
+  border: 2px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  background: #D92A22;
+  box-shadow: 0 2px 5px #17343c66;
+  transform: rotate(-45deg);
+}
+
+.leaflet-marker-icon .map-pin i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translate(-50%, -50%);
+}
+
+.leaflet-marker-icon .map-pin.pin-community {
+  background: #7b58a8;
+}
+
+.leaflet-marker-icon .map-pin.pin-off {
+  background: #a8322b;
+}
+
+.leaflet-marker-icon .map-pin.pin-unknown {
+  background: #71868a;
+}
+
+.leaflet-marker-icon.fountain-marker-icon:focus-visible {
+  outline: 3px solid #172b32;
+  outline-offset: 3px;
+  border-radius: 50%;
+}

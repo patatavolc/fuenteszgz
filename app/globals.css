@@ -14,7 +14,9 @@ button,a,input,select,textarea{touch-action:manipulation}button:focus-visible,a:
 
 .bottom-sheet.collapsed{max-height:104px;overflow:hidden}
 .topbar{justify-content:flex-end}
-.sheet-handle{touch-action:none;cursor:grab}
+.sheet-handle{position:relative;display:block;flex:none;width:48px;height:24px;padding:10px 5px;margin:0 auto 3px;border:0;background:transparent;touch-action:none;cursor:grab}
+.sheet-handle::after{content:"";display:block;width:38px;height:4px;margin:auto;border-radius:9px;background:#dce4e0}
+@media(min-width:760px){.sheet-handle{display:none}}
 .sheet-handle:active{cursor:grabbing}
 .bottom-sheet.collapsed .sheet-header{align-items:center}
 .bottom-sheet.collapsed .collapse-button{transform:rotate(180deg)}
@@ -97,3 +99,55 @@ button,a,input,select,textarea{touch-action:manipulation}button:focus-visible,a:
 @media(prefers-reduced-motion:reduce){
   .map-control,.icon-button,.collapse-button,.primary-action,.secondary-action{transition:none}
 }
+
+/* Keep the two primary map actions aligned and compact on every viewport. */
+.map-toolbar{position:absolute;z-index:500;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));display:flex;align-items:flex-start;gap:8px;pointer-events:none}
+.map-toolbar>*{pointer-events:auto}
+.map-toolbar .location-button{flex:0 0 48px;width:48px;height:48px;min-width:48px;min-height:48px;border-radius:14px}
+.map-toolbar .search-box{position:static;flex:1 1 auto;width:auto;min-width:0;margin:0;padding:4px 6px;border-radius:15px}
+.map-toolbar .search-box form{min-width:0;gap:7px}
+.map-toolbar .search-box form>button{flex:0 0 44px;width:44px;height:44px;min-width:44px;min-height:44px}
+.map-toolbar .search-box input{height:44px;min-width:0}
+.map-toolbar .search-subrow{min-width:0}
+.legend-control{position:absolute;z-index:400;right:max(10px,env(safe-area-inset-right));bottom:calc(51dvh + 10px);display:grid;justify-items:end;gap:7px}
+.legend-toggle{min-height:44px;padding:0 12px;border:1px solid #e4ebe7;border-radius:13px;background:#ffffffed;box-shadow:0 3px 12px #1635321b;color:#52686c;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700}
+.legend-toggle svg{transition:transform .15s ease}
+.legend-control.expanded .legend-toggle svg{transform:rotate(180deg)}
+.map-legend{position:static;display:grid;gap:6px;max-width:calc(100vw - 20px);padding:9px 11px;border:1px solid #e4ebe7;border-radius:12px;background:#ffffffed;box-shadow:0 3px 12px #1635321b;font-size:11px;line-height:1.35;color:#637679}
+.map-legend[hidden]{display:none}
+.map-legend span{display:flex;align-items:center;gap:7px}
+.legend-dot{width:10px;height:10px;flex:none}
+@media(max-width:759px){
+  .map-toolbar{left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right))}
+  .map-toolbar .location-button{flex-basis:46px;width:46px;height:46px;min-width:46px;min-height:46px}
+  .map-toolbar .search-box{padding-left:7px;padding-right:5px}
+  .map-toolbar .search-box form{gap:5px}
+  .map-toolbar .search-box form>button{flex-basis:44px;width:44px;min-width:44px}
+  .map-toolbar .search-box input{font-size:13px}
+  .map-toolbar .search-subrow{gap:2px}
+  .map-toolbar .subtle-button,.map-toolbar .filter-trigger{min-height:44px;padding-left:3px;padding-right:3px;font-size:10px;white-space:nowrap}
+  .legend-control{right:max(10px,env(safe-area-inset-right));bottom:calc(51dvh + 10px)}
+  .map-region:has(.bottom-sheet.has-selection) .legend-control{bottom:calc(69dvh + 10px)}
+  .map-region:has(.bottom-sheet.collapsed) .legend-control{bottom:116px}
+}
+@media(min-width:760px){
+  .map-toolbar{top:18px;left:22px;right:auto;width:454px}
+  .map-toolbar .search-box{padding:4px 7px}
+  .legend-control{right:22px;bottom:28px}
+}
+@media(max-width:340px){
+  .map-toolbar{gap:6px}
+  .map-toolbar .location-button{flex-basis:44px;width:44px;height:44px;min-width:44px;min-height:44px}
+  .map-toolbar .search-box{padding-left:5px;padding-right:4px}
+  .map-toolbar .search-box form{gap:3px}
+  .map-toolbar .search-box form>button{flex-basis:44px;width:44px;min-width:44px}
+  .map-toolbar .search-subrow .subtle-button{font-size:9px}
+}
+.propose-source-button{position:absolute;z-index:410;top:calc(100dvh - 118px);right:max(12px,env(safe-area-inset-right));min-height:46px;padding:0 15px;border:0;border-radius:14px;background:#176b4a;color:#fff;font-weight:700;box-shadow:0 4px 16px #16353235}
+.proposal-overlay{position:absolute;z-index:1000;inset:0;display:grid;place-items:center;padding:16px;background:#12221f8c}
+.proposal-overlay[hidden]{display:none}
+.proposal-dialog{position:relative;width:min(620px,100%);max-height:min(85dvh,900px);overflow:auto;padding:24px;border-radius:18px;background:#fff;box-shadow:0 12px 48px #10251f50}
+.proposal-close{position:sticky;float:right;top:0;z-index:1;width:42px;height:42px;border:1px solid #d5ddda;border-radius:50%;background:#fff}
+.proposal-dialog .community-source-module__form{padding-top:1rem}
+.map-control.active{background:#176b4a;color:white}
+@media(max-width:759px){.propose-source-button{top:auto;bottom:calc(51dvh + 10px);left:max(10px,env(safe-area-inset-left));right:auto}.map-region:has(.bottom-sheet.has-selection) .propose-source-button{bottom:calc(69dvh + 10px)}.map-region:has(.bottom-sheet.collapsed) .propose-source-button{bottom:116px}.proposal-dialog{padding:18px 14px}}
