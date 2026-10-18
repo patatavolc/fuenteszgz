@@ -55,8 +55,18 @@ export default function HomeClient() {
   const [notice, setNotice] = useState("");
   const [recenter, setRecenter] = useState<Point | null>(null);
   const lastGeocodeAt = useRef(0);
+  const resultsListRef = useRef<HTMLDivElement>(null);
+  const resultsScrollTop = useRef(0);
+  const restoreResultsScroll = useRef(false);
 
   useEffect(() => { setFavoriteIds(getFavorites()); setIncidents(getIncidents()); }, []);
+
+  useEffect(() => {
+    if (!selected && restoreResultsScroll.current) {
+      if (resultsListRef.current) resultsListRef.current.scrollTop = resultsScrollTop.current;
+      restoreResultsScroll.current = false;
+    }
+  }, [selected]);
 
   const actualOrigin = useMemo(() => location.point && !hasChosenOrigin ? { ...location.point, label: "Tu ubicación" } : origin, [location.point, hasChosenOrigin, origin]);
   const results = useMemo(() => findNearby(fountains, actualOrigin, { maxDistanceKm: maxKm, greenOnly, excludeSeasonal, status: statusFilter as "todas" | Fountain["status"] })
@@ -71,7 +81,17 @@ export default function HomeClient() {
     location.locate(setRecenter);
   };
   const useMapOrigin = (point: Point) => { setOrigin({ ...point, label: "Punto elegido en el mapa" }); setHasChosenOrigin(true); setSelectingOrigin(false); };
-  const chooseFountain = useCallback((fountain: Fountain) => { setSelected(fountain); setRecenter(fountain); }, []);
+  const chooseFountain = useCallback((fountain: Fountain) => {
+    if (resultsListRef.current) resultsScrollTop.current = resultsListRef.current.scrollTop;
+    setSheetCollapsed(false);
+    setSelected(fountain);
+    setRecenter(fountain);
+  }, []);
+  const returnToResults = () => {
+    restoreResultsScroll.current = true;
+    setSheetCollapsed(false);
+    setSelected(null);
+  };
   const toggleFavorite = (id: string) => setFavoriteIds(saveFavorite(id));
 
   const searchAddress = async (event: React.FormEvent) => {
@@ -122,13 +142,13 @@ export default function HomeClient() {
         {!selected ? <>
           <nav className="tabs" aria-label="Vistas"><button className={tab !== "favoritos" ? "selected" : ""} aria-pressed={tab !== "favoritos"} onClick={() => setTab("mapa")}><MapPin size={16}/> Cercanas</button><button className={tab === "favoritos" ? "selected" : ""} aria-pressed={tab === "favoritos"} onClick={() => { setFavoriteIds(getFavorites()); setTab("favoritos"); }}><Bookmark size={15}/> Favoritos {favoriteIds.length > 0 && <span className="count-badge">{favoriteIds.length}</span>}</button></nav>
           <div className="list-meta"><span>En línea recta · ordenadas por distancia</span><button onClick={() => { setRecenter(location.point ?? origin); }}><Compass size={15}/> Centrar</button></div>
-          <div className="results-list" role="list">
+          <div className="results-list" role="list" ref={resultsListRef}>
             {visibleResults.slice(0, 40).map(({ fountain, distance }) => <button className="result-row" key={fountain.id} onClick={() => chooseFountain(fountain)} role="listitem"><span className={`result-drop ${fountain.source === "OpenStreetMap (comunidad)" ? "community" : ""}`}><Droplets size={18}/></span><span className="result-copy"><strong>{fountain.name}</strong><small>{fountain.location ?? fountain.address ?? (fountain.source === "OpenStreetMap (comunidad)" ? "Punto cartografiado por la comunidad" : "Ubicación municipal")}</small><span className={`status-mini ${fountain.source === "OpenStreetMap (comunidad)" ? "unknown" : fountain.status === "operativa" ? "ok" : fountain.status === "desconocida" ? "unknown" : "off"}`}>{statusText(fountain)}</span></span><span className="result-distance">{formatDistance(distance)}</span></button>)}
             {visibleResults.length === 0 && <div className="empty-state"><Droplets size={25}/><strong>No hay fuentes con estos filtros</strong><span>Amplía la distancia o cambia algún filtro.</span><button onClick={() => { setMaxKm(20); setGreenOnly(false); setExcludeSeasonal(false); setStatusFilter("todas"); setSearchText(""); }}>Quitar filtros</button></div>}
             {visibleResults.length > 40 && <p className="more-results">Mostrando las 40 más cercanas. Acerca el mapa para explorar más.</p>}
           </div>
         </> : <div className="detail-content">
-          <button className="back-link" onClick={() => setSelected(null)}><X size={15}/> Volver a resultados</button>
+          <button className="back-link" onClick={returnToResults}><X size={15}/> Volver a resultados</button>
           <div className={`status-pill ${selected.source === "OpenStreetMap (comunidad)" ? "community-pill" : selected.status === "operativa" ? "good" : selected.status === "desconocida" ? "muted" : "bad"}`}><span/> {statusText(selected)}</div>
           <p className="address-line"><MapPin size={16}/>{selected.address ?? selected.location ?? "Sin dirección publicada"}</p>
           <div className="detail-distance"><span>Distancia en línea recta</span><strong>{formatDistance(distanceMeters(actualOrigin, selected))}</strong></div>
