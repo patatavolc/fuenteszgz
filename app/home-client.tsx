@@ -25,13 +25,32 @@ const statusText = (fountain: Fountain) => fountain.source === "OpenStreetMap (c
 function useLocation() {
   const [state, setState] = useState<GeolocationState>("sin-solicitar");
   const [point, setPoint] = useState<Point | null>(null);
-  const locate = useCallback((onLocated?: (point: Point) => void) => {
+  const [following, setFollowing] = useState(false);
+  const watchId = useRef<number | null>(null);
+  const stopFollowing = useCallback(() => {
+    if (watchId.current !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId.current);
+    watchId.current = null;
+    setFollowing(false);
+  }, []);
+  const toggleFollowing = useCallback((onLocated?: (point: Point) => void) => {
+    if (watchId.current !== null) { stopFollowing(); return; }
     if (!navigator.geolocation) { setState("no-disponible"); return; }
     setState("pendiente");
-    navigator.geolocation.getCurrentPosition(({ coords }) => { const value = { lat: coords.latitude, lon: coords.longitude }; setPoint(value); setState("concedida"); onLocated?.(value); }, ({ code }) => setState(geolocationStateFromError(code)), { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
+    setFollowing(true);
+    watchId.current = navigator.geolocation.watchPosition(({ coords }) => {
+      const value = { lat: coords.latitude, lon: coords.longitude };
+      setPoint(value);
+      setState("concedida");
+      onLocated?.(value);
+    }, ({ code }) => {
+      setState(geolocationStateFromError(code));
+      if (code === 1) stopFollowing();
+    }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
+  }, [stopFollowing]);
+  useEffect(() => () => {
+    if (watchId.current !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId.current);
   }, []);
-  useEffect(() => { locate(); }, [locate]);
-  return { state, point, locate };
+  return { state, point, following, toggleFollowing };
 }
 
 export default function HomeClient() {
@@ -78,9 +97,10 @@ export default function HomeClient() {
   const mapFountains = useMemo(() => visibleResults.map((entry) => entry.fountain), [visibleResults]);
   const activeFilterCount = Number(maxKm < 8) + Number(greenOnly) + Number(excludeSeasonal) + Number(statusFilter !== "todas");
 
-  const startGeolocation = () => {
+  const toggleGeolocation = () => {
+    if (location.following) { location.toggleFollowing(); return; }
     setHasChosenOrigin(false);
-    location.locate(setRecenter);
+    location.toggleFollowing(setRecenter);
   };
   const useMapOrigin = (point: Point) => { setOrigin({ ...point, label: "Punto elegido en el mapa" }); setHasChosenOrigin(true); setSelectingOrigin(false); };
   const chooseFountain = useCallback((fountain: Fountain) => { setSelected(fountain); setRecenter(fountain); }, []);
@@ -117,21 +137,18 @@ export default function HomeClient() {
 
   return <main className="app-shell relative">
     <div className="map-region" aria-label="Mapa de fuentes públicas de agua">
-      <MapView fountains={mapFountains} selectedId={selected?.id} userPoint={location.point} origin={hasChosenOrigin ? origin : null} recenter={recenter} chooseOrigin={useMapOrigin} onSelect={chooseFountain} selectingOrigin={selectingOrigin} selectingSource={selectingSource} onSourcePoint={acceptSourcePoint}/>
-      <div className="map-toolbar">
-        <button className="icon-button location-button" onClick={startGeolocation} aria-label="Localizarme" title="Localizarme"><LocateFixed size={21}/></button>
-        <section className="search-box" aria-label="Buscar un lugar">
-          <form onSubmit={searchAddress}><Search size={18} aria-hidden="true"/><input value={searchText} onChange={(event) => { setSearchText(event.target.value); setSearchError(""); }} placeholder="Dirección, parque o fuente" aria-label="Buscar dirección, parque o fuente"/><button type="submit" disabled={geocoding} aria-label="Buscar">{geocoding ? <span className="tiny-spinner"/> : <Navigation size={17}/>}</button></form>
-          {searchError && <p className="inline-error" role="alert">{searchError}</p>}
-          <div className="search-subrow"><button type="button" className="subtle-button" onClick={() => { setSelectingOrigin(true); setNotice("Toca un punto del mapa para elegir el origen."); }}>Elegir origen en el mapa</button><button type="button" className="filter-trigger" onClick={() => setShowFilters((value) => !value)} aria-expanded={showFilters} aria-controls="filters-panel"><SlidersHorizontal size={16}/> Filtros{activeFilterCount > 0 && <span className="count-badge" aria-label={`${activeFilterCount} filtros activos`}>{activeFilterCount}</span>} <ChevronDown size={14}/></button></div>
-          <div className="filters-panel" id="filters-panel" hidden={!showFilters}><label>Distancia máxima <span>{maxKm} km</span><input type="range" min="0.5" max="20" step="0.5" value={maxKm} onChange={(event) => setMaxKm(Number(event.target.value))}/></label><label className="check-label"><input type="checkbox" checked={greenOnly} onChange={(event) => setGreenOnly(event.target.checked)}/> Solo parques y zonas verdes identificados</label><label>Estado disponible<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="todas">Todos los estados</option><option value="operativa">En servicio municipal</option><option value="averiada">Averiada (con evidencia)</option><option value="cerrada">Cerrada (con evidencia)</option><option value="fuera-de-servicio">Fuera de servicio</option><option value="desconocida">Desconocido</option></select></label><label className="check-label"><input type="checkbox" checked={excludeSeasonal} onChange={(event) => setExcludeSeasonal(event.target.checked)}/> Excluir puntos marcados estacionales</label><p>La estacionalidad solo se muestra cuando la etiqueta existe en OSM.</p><button type="button" className="clear-filters" onClick={() => { setMaxKm(8); setGreenOnly(false); setExcludeSeasonal(false); setStatusFilter("todas"); }}>Restablecer filtros</button></div>
-        </section>
-      </div>
-      {(selectingOrigin || selectingSource) && <div className="map-controls"><button className="map-control active" onClick={() => { setSelectingOrigin(false); setSelectingSource(false); setShowProposal(false); }}><X size={18}/><span>Cancelar selección</span></button><span className="map-control active">{selectingSource ? "Toca el mapa para ubicar la fuente" : "Toca el mapa para elegir el origen"}</span></div>}
-      <div className={`legend-control ${showLegend ? "expanded" : ""}`}>
-        <div className="map-legend" id="map-legend-panel" role="region" aria-label="Significado de los colores del mapa" hidden={!showLegend}><span><i className="legend-dot"/> Ayuntamiento</span><span><i className="legend-dot community"/> Comunidad · OSM y propuestas aprobadas</span><span><i className="legend-dot unknown"/> Estado desconocido</span></div>
-        <button className="legend-toggle" type="button" aria-expanded={showLegend} aria-controls="map-legend-panel" onClick={() => setShowLegend((value) => !value)}>{showLegend ? "Ocultar leyenda" : "Colores del mapa"}<ChevronDown size={15} aria-hidden="true"/></button>
-      </div>
+      <MapView fountains={mapFountains} selectedId={selected?.id} userPoint={location.point} origin={hasChosenOrigin ? origin : null} recenter={recenter} chooseOrigin={useMapOrigin} onSelect={chooseFountain} selectingOrigin={selectingOrigin}/>
+      <header className="topbar">
+        <button className="icon-button location-button" onClick={toggleGeolocation} aria-label={location.following ? "Dejar de seguir mi ubicación" : "Seguir mi ubicación"} title={location.following ? "Dejar de seguir" : "Seguir mi ubicación"} aria-pressed={location.following}><LocateFixed size={21}/></button>
+      </header>
+      <section className="search-box" aria-label="Buscar un lugar">
+        <form onSubmit={searchAddress}><Search size={18} aria-hidden="true"/><input value={searchText} onChange={(event) => { setSearchText(event.target.value); setSearchError(""); }} placeholder="Dirección, parque o fuente" aria-label="Buscar dirección, parque o fuente"/><button type="submit" disabled={geocoding} aria-label="Buscar">{geocoding ? <span className="tiny-spinner"/> : <Navigation size={17}/>}</button></form>
+        {searchError && <p className="inline-error" role="alert">{searchError}</p>}
+        <div className="search-subrow"><button type="button" className="subtle-button" onClick={() => { setSelectingOrigin(true); setNotice("Toca un punto del mapa para elegir el origen."); }}>Elegir origen en el mapa</button><button type="button" className="filter-trigger" onClick={() => setShowFilters((value) => !value)} aria-expanded={showFilters} aria-controls="filters-panel"><SlidersHorizontal size={16}/> Filtros{activeFilterCount > 0 && <span className="count-badge" aria-label={`${activeFilterCount} filtros activos`}>{activeFilterCount}</span>} <ChevronDown size={14}/></button></div>
+        <div className="filters-panel" id="filters-panel" hidden={!showFilters}><label>Distancia máxima <span>{maxKm} km</span><input type="range" min="0.5" max="20" step="0.5" value={maxKm} onChange={(event) => setMaxKm(Number(event.target.value))}/></label><label className="check-label"><input type="checkbox" checked={greenOnly} onChange={(event) => setGreenOnly(event.target.checked)}/> Solo parques y zonas verdes identificados</label><label>Estado disponible<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="todas">Todos los estados</option><option value="operativa">En servicio municipal</option><option value="averiada">Averiada (con evidencia)</option><option value="cerrada">Cerrada (con evidencia)</option><option value="fuera-de-servicio">Fuera de servicio</option><option value="desconocida">Desconocido</option></select></label><label className="check-label"><input type="checkbox" checked={excludeSeasonal} onChange={(event) => setExcludeSeasonal(event.target.checked)}/> Excluir puntos marcados estacionales</label><p>La estacionalidad solo se muestra cuando la etiqueta existe en OSM.</p><button type="button" className="clear-filters" onClick={() => { setMaxKm(8); setGreenOnly(false); setExcludeSeasonal(false); setStatusFilter("todas"); }}>Restablecer filtros</button></div>
+      </section>
+      {selectingOrigin && <div className="map-controls"><button className="map-control active" onClick={() => setSelectingOrigin(false)}><X size={18}/><span>Cancelar origen</span></button></div>}
+      <div className="map-legend" aria-label="Leyenda del mapa"><span><i className="legend-dot"/> Ayuntamiento</span><span><i className="legend-dot community"/> OSM · sin coincidencia municipal</span><span><i className="legend-dot unknown"/> Estado desconocido</span></div>
       <div className="attribution-note">Mapa © OpenStreetMap · <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noreferrer">Informar de un error</a></div>
       <button className="propose-source-button" onClick={() => { setShowProposal(true); setSelectingSource(false); }}>Añadir una fuente</button>
       <div className="proposal-overlay" hidden={!showProposal || selectingSource} role="dialog" aria-modal="true" aria-label="Proponer una fuente"><div className="proposal-dialog"><button className="proposal-close" type="button" onClick={() => setShowProposal(false)} aria-label="Cerrar"><X size={18}/></button><CommunitySourceForm onPickCoordinates={(accept) => { sourcePointCallback.current = accept; setSelectingSource(true); setShowProposal(false); }} onSubmitted={() => { setShowProposal(false); setNotice("Propuesta enviada para revisión; aparecerá en el mapa si se aprueba."); }} onCancel={() => setShowProposal(false)}/></div></div>
