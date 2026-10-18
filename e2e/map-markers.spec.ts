@@ -16,7 +16,7 @@ test("filter changes reuse the Leaflet cluster group and retained marker instanc
       __createdGroups: number;
       __initialMarkersReady: boolean;
     };
-    const browserWindow = window as InstrumentedWindow;
+    const browserWindow = window as unknown as InstrumentedWindow;
     browserWindow.__createdMarkers = 0;
     browserWindow.__createdGroups = 0;
     browserWindow.__initialMarkersReady = false;
@@ -66,7 +66,7 @@ test("filter changes reuse the Leaflet cluster group and retained marker instanc
   await page.waitForFunction(() => (window as Window & { __initialMarkersReady?: boolean }).__initialMarkersReady === true);
 
   const initialCreations = await page.evaluate(() => {
-    const browserWindow = window as Window & { __createdMarkers: number; __createdGroups: number };
+    const browserWindow = window as unknown as Window & { __createdMarkers: number; __createdGroups: number };
     return { markers: browserWindow.__createdMarkers, groups: browserWindow.__createdGroups };
   });
   expect(initialCreations.markers).toBeGreaterThan(0);
@@ -80,7 +80,7 @@ test("filter changes reuse the Leaflet cluster group and retained marker instanc
   await status.selectOption("operativa");
   await expect.poll(async () => Number((await heading.innerText()).match(/\d+/)?.[0])).toBeLessThan(initialCount);
   const narrowedCreations = await page.evaluate(() => {
-    const browserWindow = window as Window & { __createdMarkers: number; __createdGroups: number };
+    const browserWindow = window as unknown as Window & { __createdMarkers: number; __createdGroups: number };
     return { markers: browserWindow.__createdMarkers, groups: browserWindow.__createdGroups };
   });
   expect(narrowedCreations.markers - initialCreations.markers).toBe(0);
