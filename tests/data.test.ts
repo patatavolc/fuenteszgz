@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPrioritizedDisplaySet, deduplicateFountains, distanceMeters, findNearby, normalizeMunicipalData, normalizeOsmData } from "@/lib/data";
+import { deduplicateFountains, distanceMeters, findNearby, normalizeMunicipalData, normalizeMunicipalDataWithReport, normalizeOsmDataWithReport } from "@/lib/data";
 import type { Fountain } from "@/lib/types";
 
 const fountain = (id: string, lat: number, lon: number, overrides: Partial<Fountain> = {}): Fountain => ({
@@ -8,17 +8,26 @@ const fountain = (id: string, lat: number, lon: number, overrides: Partial<Fount
 
 describe("normalización municipal", () => {
   it("normaliza coordenadas WGS84 y campos de ubicación", () => {
-    const data = normalizeMunicipalData({ features: [{ id: "f.1", geometry: { type: "Point", coordinates: [-0.88, 41.65] }, properties: { codigo: "F1", vial: " Calle Mayor ", ubicacion: "Parque Central", en_servicio: true } }] });
+    const data = normalizeMunicipalData({ type: "FeatureCollection", features: [{ type: "Feature", id: "f.1", geometry: { type: "Point", coordinates: [-0.88, 41.65] }, properties: { codigo: "F1", vial: " Calle Mayor ", ubicacion: "Parque Central", en_servicio: true } }] });
     expect(data).toHaveLength(1);
     expect(data[0]).toMatchObject({ id: "municipal:F1", lat: 41.65, lon: -0.88, address: "Calle Mayor", status: "operativa", isGreenArea: true });
   });
 
   it("descarta registros sin coordenadas válidas o identificador", () => {
-    const data = normalizeMunicipalData({ features: [
-      { id: "x", geometry: { type: "Point", coordinates: [220, 41] }, properties: { codigo: "bad" } },
-      { id: "", geometry: { type: "Point", coordinates: [-.8, 41] }, properties: {} },
+    const data = normalizeMunicipalData({ type: "FeatureCollection", features: [
+      { type: "Feature", id: "x", geometry: { type: "Point", coordinates: [220, 41] }, properties: { codigo: "bad" } },
+      { type: "Feature", id: "", geometry: { type: "Point", coordinates: [-.8, 41] }, properties: {} },
     ] });
     expect(data).toEqual([]);
+  });
+
+  it("expone conteos y causas de descarte al normalizar", () => {
+    const result = normalizeMunicipalDataWithReport({ type: "FeatureCollection", features: [
+      { type: "Feature", id: "good", geometry: { type: "Point", coordinates: [-.8, 41] }, properties: { codigo: "F1" } },
+      { type: "Feature", id: "bad", geometry: { type: "Point", coordinates: [181, 41] }, properties: { codigo: "F2" } },
+    ] });
+    expect(result.fountains).toHaveLength(1);
+    expect(result.report).toMatchObject({ total: 2, accepted: 1, discarded: 1, discardedByReason: { "invalid-coordinate": 1 } });
   });
 
   it("deduplica solo coincidencias plausibles sin fusionar fuentes distintas", () => {
@@ -29,13 +38,14 @@ describe("normalización municipal", () => {
   });
 
   it("acepta únicamente etiquetas OSM explícitas y conserva procedencia/estacionalidad", () => {
-    const data = normalizeOsmData({ timestamp: "2026-10-16T10:41:20Z", features: [
-      { id: "node/1", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { tags: { amenity: "drinking_water", seasonal: "summer" } } },
-      { id: "node/2", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { tags: { amenity: "drinking_water", access: "private" } } },
-      { id: "node/3", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { tags: { amenity: "fountain" } } },
+    const { fountains: data, report } = normalizeOsmDataWithReport({ type: "FeatureCollection", timestamp: "2026-10-16T10:41:20Z", features: [
+      { type: "Feature", id: "node/1", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { tags: { amenity: "drinking_water", seasonal: "summer" } } },
+      { type: "Feature", id: "node/2", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { tags: { amenity: "drinking_water", access: "private" } } },
+      { type: "Feature", id: "node/3", geometry: { type: "Point", coordinates: [-.88, 41.65] }, properties: { tags: { amenity: "fountain" } } },
     ] });
     expect(data).toHaveLength(1);
     expect(data[0]).toMatchObject({ id: "osm:node/1", source: "OpenStreetMap (comunidad)", status: "desconocida", seasonal: "summer", sourceUpdatedAt: "2026-10-16T10:41:20Z" });
+    expect(report).toMatchObject({ total: 3, accepted: 1, discarded: 2, discardedByReason: { "restricted-access": 1, "non-candidate": 1 } });
   });
 });
 

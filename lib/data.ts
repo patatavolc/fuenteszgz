@@ -1,21 +1,20 @@
 import collection from "@/data/municipal-snapshot.geojson";
 import osmCollection from "@/data/osm-candidates.geojson";
-import type { CommunitySource, Fountain, OperatingStatus, Point } from "./types";
-
-type Feature = { id: string; geometry?: { type?: string; coordinates?: number[] }; properties?: Record<string, unknown> };
-type Collection = { features?: Feature[] };
+import { validateSnapshot, type SnapshotValidationReport } from "./snapshot-validation";
+import type { Fountain, OperatingStatus, Point } from "./types";
 
 export function normalizeMunicipalData(input: unknown): Fountain[] {
-  if (!input || typeof input !== "object" || !Array.isArray((input as Collection).features)) return [];
+  return normalizeMunicipalDataWithReport(input).fountains;
+}
+
+export function normalizeMunicipalDataWithReport(input: unknown): { fountains: Fountain[]; report: SnapshotValidationReport } {
+  const { features, report } = validateSnapshot(input, "municipal");
   const output: Fountain[] = [];
-  for (const feature of (input as Collection).features ?? []) {
-    const coordinates = feature.geometry?.coordinates;
-    if (feature.geometry?.type !== "Point" || !coordinates || coordinates.length < 2) continue;
+  for (const feature of features) {
+    const coordinates = feature.geometry.coordinates;
     const [lon, lat] = coordinates;
-    if (typeof lat !== "number" || typeof lon !== "number" || !Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) continue;
-    const properties = feature.properties ?? {};
+    const properties = feature.properties;
     const code = String(properties.codigo ?? feature.id ?? "").trim();
-    if (!code) continue;
     const location = clean(properties.ubicacion);
     const address = clean(properties.vial);
     const service = properties.en_servicio;
@@ -30,24 +29,24 @@ export function normalizeMunicipalData(input: unknown): Fountain[] {
       source: "Ayuntamiento de Zaragoza", sourceUrl: "https://www.zaragoza.es/web/espacio-de-datos/servicio/catalogo/2860", confidence: "alta",
     });
   }
-  return deduplicateFountains(output);
+  const fountains = deduplicateFountains(output);
+  return { fountains, report: { ...report, normalized: fountains.length } };
 }
 
 export function normalizeOsmData(input: unknown): Fountain[] {
-  if (!input || typeof input !== "object" || !Array.isArray((input as Collection).features)) return [];
-  const metadata = input as { timestamp?: unknown };
+  return normalizeOsmDataWithReport(input).fountains;
+}
+
+export function normalizeOsmDataWithReport(input: unknown): { fountains: Fountain[]; report: SnapshotValidationReport } {
+  const { features, report } = validateSnapshot(input, "osm");
+  const metadata = input && typeof input === "object" ? input as { timestamp?: unknown } : {};
   const output: Fountain[] = [];
-  for (const feature of (input as Collection).features ?? []) {
-    const coordinates = feature.geometry?.coordinates;
-    if (feature.geometry?.type !== "Point" || !coordinates || coordinates.length < 2) continue;
+  for (const feature of features) {
+    const coordinates = feature.geometry.coordinates;
     const [lon, lat] = coordinates;
-    if (typeof lat !== "number" || typeof lon !== "number" || !Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) continue;
-    const properties = feature.properties ?? {};
-    const tags = properties.tags && typeof properties.tags === "object" ? properties.tags as Record<string, string> : {};
-    const candidate = tags.amenity === "drinking_water" || (tags.amenity === "fountain" && (tags.fountain === "drinking" || tags.drinking_water === "yes"));
-    if (!candidate || tags.drinking_water === "no" || ["no", "private"].includes(tags.access ?? "")) continue;
+    const properties = feature.properties;
+    const tags = properties.tags as Record<string, string>;
     const rawId = String(feature.id ?? "").trim();
-    if (!rawId) continue;
     const id = rawId.startsWith("osm:") ? rawId.slice(4) : rawId;
     const addressParts = [tags["addr:street"], tags["addr:housenumber"]].filter(Boolean);
     const location = tags["is_in:park"] ?? (tags.location === "park" ? "Parque (según OSM)" : undefined);
@@ -63,7 +62,8 @@ export function normalizeOsmData(input: unknown): Fountain[] {
       confidence: "media", osmTags: tags,
     });
   }
-  return deduplicateFountains(output);
+  const fountains = deduplicateFountains(output);
+  return { fountains, report: { ...report, normalized: fountains.length } };
 }
 
 function clean(value: unknown): string | undefined {
