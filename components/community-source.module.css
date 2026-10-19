@@ -24,3 +24,20 @@
 .queue h3, .queue p { margin: 0; }
 .queue a { color: #145f3d; }
 @media (max-width: 480px) { .coordinates { grid-template-columns: 1fr; } .moderation > header { align-items: flex-start; } }
+
+:global(html[data-theme="dark"]) .form,
+:global(html[data-theme="dark"]) .moderation { color: var(--ink); }
+:global(html[data-theme="dark"]) .form input:not([type="checkbox"]),
+:global(html[data-theme="dark"]) .form textarea { background: var(--paper); color: var(--ink); border-color: var(--line); }
+:global(html[data-theme="dark"]) .form input::placeholder,
+:global(html[data-theme="dark"]) .form textarea::placeholder { color: var(--muted); }
+:global(html[data-theme="dark"]) .coordinates,
+:global(html[data-theme="dark"]) .queue li { border-color: var(--line); }
+:global(html[data-theme="dark"]) .privacy { color: var(--muted); }
+:global(html[data-theme="dark"]) .error { color: #ffaaa4; }
+:global(html[data-theme="dark"]) .notice { color: #a3d7c2; }
+:global(html[data-theme="dark"]) .actions button,
+:global(html[data-theme="dark"]) .form button { background: var(--teal); color: white; }
+:global(html[data-theme="dark"]) .actions .secondary,
+:global(html[data-theme="dark"]) .form .secondary { border-color: var(--line); background: var(--surface); color: var(--ink); }
+:global(html[data-theme="dark"]) .queue a { color: #a3d7c2; }

@@ -3,8 +3,9 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bookmark, Check, ChevronDown, Compass, Droplets, LocateFixed, MapPin, Navigation, Search, Send, ShieldAlert, SlidersHorizontal, X } from "lucide-react";
+import { Bookmark, Check, ChevronDown, Compass, Droplets, LocateFixed, MapPin, Navigation, Search, Send, Settings2, ShieldAlert, SlidersHorizontal, X } from "lucide-react";
 import { distanceMeters, findNearby, fountains, hasSeasonalEvidence, municipalFountains, normalizeCommunitySources, osmFountains } from "@/lib/data";
+import { getAppearancePreference, saveAppearancePreference, type AppearancePreference } from "@/lib/appearance";
 import { CommunitySourceForm } from "@/components/community-source-form";
 import { geolocationStateFromError, type GeolocationState } from "@/lib/geolocation";
 import { getFavorites, getIncidents, saveFavorite, saveIncident } from "@/lib/local-storage";
@@ -55,6 +56,9 @@ function useLocation() {
 
 export default function HomeClient() {
   const location = useLocation();
+  const [appearance, setAppearance] = useState<AppearancePreference>("system");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsDialogRef = useRef<HTMLDialogElement>(null);
   const [origin, setOrigin] = useState<Origin>(center);
   const [hasChosenOrigin, setHasChosenOrigin] = useState(false);
   const [selected, setSelected] = useState<Fountain | null>(null);
@@ -88,6 +92,23 @@ export default function HomeClient() {
   const sheetDragStart = useRef<number | null>(null);
   const sheetDragged = useRef(false);
 
+  useEffect(() => {
+    const preference = getAppearancePreference();
+    setAppearance(preference);
+  }, []);
+  useEffect(() => {
+    const systemPreference = window.matchMedia("(prefers-color-scheme: dark)");
+    const applyTheme = () => document.documentElement.setAttribute("data-theme", appearance === "system" ? systemPreference.matches ? "dark" : "light" : appearance);
+    applyTheme();
+    systemPreference.addEventListener("change", applyTheme);
+    return () => systemPreference.removeEventListener("change", applyTheme);
+  }, [appearance]);
+  useEffect(() => {
+    const dialog = settingsDialogRef.current;
+    if (!dialog) return;
+    if (settingsOpen && !dialog.open) dialog.showModal();
+    else if (!settingsOpen && dialog.open) dialog.close();
+  }, [settingsOpen]);
   useEffect(() => { setFavoriteIds(getFavorites()); setIncidents(getIncidents()); }, []);
   useEffect(() => { fetch("/api/community-sources").then((response) => response.ok ? response.json() : []).then((data) => setCommunityFountains(normalizeCommunitySources(data))).catch(() => setCommunityFountains([])); }, []);
 
@@ -126,6 +147,10 @@ export default function HomeClient() {
   };
   const acceptSourcePoint = useCallback((point: Point) => { sourcePointCallback.current?.(point); sourcePointCallback.current = null; setSelectingSource(false); setShowProposal(true); setNotice("Ubicación seleccionada. Completa los datos y envía la propuesta para revisión."); }, []);
   const toggleFavorite = (id: string) => setFavoriteIds(saveFavorite(id));
+  const updateAppearance = (preference: AppearancePreference) => {
+    setAppearance(preference);
+    saveAppearancePreference(preference);
+  };
 
   const searchAddress = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -159,8 +184,17 @@ export default function HomeClient() {
     <div className="map-region" aria-label="Mapa de fuentes públicas de agua">
       <MapView fountains={mapFountains} selectedId={selected?.id} userPoint={location.point} origin={hasChosenOrigin ? origin : null} recenter={recenter} chooseOrigin={useMapOrigin} onSelect={chooseFountain} selectingOrigin={selectingOrigin}/>
       <header className="topbar">
-        <button className="icon-button location-button" onClick={toggleGeolocation} aria-label={location.following ? "Dejar de seguir mi ubicación" : "Seguir mi ubicación"} title={location.following ? "Dejar de seguir" : "Seguir mi ubicación"} aria-pressed={location.following}><LocateFixed size={21}/></button>
+        <Link href="/" className="brand" aria-label="Fuentes de ZGZ, inicio"><span className="brand-icon"><Droplets size={21}/></span><span className="brand-copy"><strong>Fuentes de <span>ZGZ</span></strong><small>Agua pública en Zaragoza</small></span></Link>
+        <div className="topbar-actions">
+          <button className="icon-button location-button" onClick={toggleGeolocation} aria-label={location.following ? "Dejar de seguir mi ubicación" : "Seguir mi ubicación"} title={location.following ? "Dejar de seguir" : "Seguir mi ubicación"} aria-pressed={location.following}><LocateFixed size={21}/></button>
+          <button className="icon-button settings-button" onClick={() => setSettingsOpen(true)} aria-label="Ajustes" title="Ajustes"><Settings2 size={20}/></button>
+        </div>
       </header>
+      <dialog ref={settingsDialogRef} className="settings-dialog" aria-labelledby="settings-title" onCancel={() => setSettingsOpen(false)} onClose={() => setSettingsOpen(false)}>
+        <div className="settings-dialog-header"><div><h2 id="settings-title">Ajustes</h2><p>Personaliza cómo ves el mapa.</p></div><button className="settings-close" type="button" onClick={() => setSettingsOpen(false)} aria-label="Cerrar ajustes"><X size={18}/></button></div>
+        <label className="appearance-setting"><span>Apariencia</span><select value={appearance} onChange={(event) => updateAppearance(event.target.value as AppearancePreference)}><option value="system">Seguir el sistema</option><option value="light">Claro</option><option value="dark">Oscuro</option></select></label>
+        <p className="settings-note">El modo del mapa base se mantiene para conservar su lectura y atribución.</p>
+      </dialog>
       <section className="search-box" aria-label="Buscar un lugar">
         <form onSubmit={searchAddress}><Search size={18} aria-hidden="true"/><input value={searchText} onChange={(event) => { setSearchText(event.target.value); setSearchError(""); }} placeholder="Dirección, parque o fuente" aria-label="Buscar dirección, parque o fuente"/><button type="submit" disabled={geocoding} aria-label="Buscar">{geocoding ? <span className="tiny-spinner"/> : <Navigation size={17}/>}</button></form>
         {searchError && <p className="inline-error" role="alert">{searchError}</p>}

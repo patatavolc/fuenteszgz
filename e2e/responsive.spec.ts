@@ -182,3 +182,26 @@ test("empty results, geocoding errors and accessible control states are announce
   await expect(page.getByRole("slider", { name: /Distancia máxima/ })).toBeVisible();
   await expect(page.getByRole("checkbox", { name: /Solo parques y zonas verdes identificados/ })).toBeVisible();
 });
+
+test("appearance setting switches theme and persists the choice", async ({ page }) => {
+  await page.route("https://tile.openstreetmap.org/**", (route) => route.abort());
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Ajustes" }).click();
+  const appearance = page.getByLabel("Apariencia");
+  await expect(appearance).toBeVisible();
+  await appearance.selectOption("dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator(".bottom-sheet")).toHaveCSS("background-color", "rgb(32, 38, 40)");
+
+  await page.getByRole("button", { name: "Cerrar ajustes" }).click();
+  await page.getByRole("button", { name: "Añadir una fuente" }).click();
+  const coordinatePicker = page.getByRole("button", { name: "Elegir coordenadas en el mapa" });
+  await expect(coordinatePicker).toHaveCSS("background-color", "rgb(41, 50, 53)");
+  await expect(coordinatePicker).toHaveCSS("color", "rgb(237, 242, 242)");
+
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.getByRole("button", { name: "Ajustes" }).click();
+  await expect(page.getByLabel("Apariencia")).toHaveValue("dark");
+});
